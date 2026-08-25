@@ -6,14 +6,16 @@ __pycache__/
 .pytest_cache/
 .coverage
 
-htmlcov/
-report.html
-report/
-reports/ci/
-reports/selenium/
+# Generated test reports and debugging artifacts
+reports/
 test-results/
 
 *.db
 *.db-journal
 *.sqlite
 *.sqlite3
+
+# Local virtual environments and logs
+.venv/
+venv/
+*.log

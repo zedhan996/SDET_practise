@@ -58,14 +58,14 @@ python -m uvicorn main:app --reload --log-config logging.ini
 ## 运行测试并生成报告
 
 ```powershell
-python -m pytest --cov=main --cov-report=term-missing --cov-report=html --html=report.html --self-contained-html -q
+python -m pytest --cov=main --cov-report=term-missing --cov-report=html:reports/coverage --html=reports/pytest/pytest-report.html --self-contained-html -q
 ```
 
 报告位置：
 
-- `report.html`：pytest 测试执行报告
-- `htmlcov/index.html`：代码覆盖率报告首页
-- `test-results/`：Playwright 用例失败时保留的全页截图和 Trace
+- `reports/pytest/pytest-report.html`：pytest 测试执行报告
+- `reports/coverage/index.html`：代码覆盖率报告首页
+- `reports/playwright/`：Playwright 用例失败时保留的截图和 Trace
 
 `pytest.ini` 默认配置为仅在 Playwright 用例失败时生成截图，并保留失败 Trace；测试成功时不会产生这些调试文件。
 
@@ -125,8 +125,13 @@ CLI 本身的测试位于 `test_qa_tool.py`，覆盖帮助信息、环境检查�
 |   `-- app.js         登录、请求、渲染和页面交互逻辑
 |-- dev.db            开发环境 SQLite 数据库（运行服务后生成）
 |-- test_isolated.db  测试环境 SQLite 数据库（运行 pytest 后生成）
-|-- report.html       pytest 生成的测试执行报告
-`-- htmlcov/          coverage.py 生成的 HTML 覆盖率报告
+`-- reports/          所有测试工具生成的报告和调试产物
+    |-- ci/           CI 生成的 JUnit、覆盖率和 pytest 报告
+    |-- coverage/     coverage.py 生成的 HTML 覆盖率报告
+    |-- locust/       Locust 压测报告
+    |-- playwright/   Playwright 失败截图和 Trace
+    |-- pytest/       本地 pytest HTML 报告
+    `-- selenium/     Selenium 失败截图
 ```
 
-`report.html` 和 `htmlcov/` 都是可重新生成的测试产物，不应手工修改。
+`reports/` 下的内容都是可重新生成的测试产物，不应手工修改，也不提交到 Git。
