@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>商品目录工作台</title>
+  <link rel="stylesheet" href="/app/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="/app/" aria-label="商品目录工作台首页">
+        <span class="brand-mark">W</span>
+        <span>
+          <strong>商品目录工作台</strong>
+          <small>Web 后端测开实战</small>
+        </span>
+      </a>
+      <div class="topbar-actions">
+        <span id="connection-state" class="connection-state"><span class="status-dot"></span>未连接</span>
+        <span id="user-badge" class="user-badge hidden"></span>
+        <button id="logout-button" class="button button-quiet hidden" type="button">退出登录</button>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <section id="login-view" class="login-layout">
+        <div class="intro-panel">
+          <p class="eyebrow">CATALOG OPERATIONS</p>
+          <h1>把接口能力，变成可操作的工作台。</h1>
+          <p class="intro-copy">登录后查询和维护商品目录，用真实浏览器流程验证 FastAPI 服务、数据库和鉴权链路。</p>
+          <div class="intro-metrics" aria-label="项目能力">
+            <span><strong>CRUD</strong><small>目录维护</small></span>
+            <span><strong>JWT</strong><small>身份鉴权</small></span>
+            <span><strong>SQLite</strong><small>数据落库</small></span>
+          </div>
+        </div>
+        <form id="login-form" class="form-panel" novalidate>
+          <div class="panel-heading">
+            <p class="eyebrow">SECURE ACCESS</p>
+            <h2>登录工作台</h2>
+            <p>使用测试账户进入目录管理。</p>
+          </div>
+          <label class="field-label" for="login-username">用户名</label>
+          <input id="login-username" class="text-input" name="username" autocomplete="username" value="admin" required>
+          <label class="field-label" for="login-password">密码</label>
+          <input id="login-password" class="text-input" name="password" type="password" autocomplete="current-password" value="Admin@123" required>
+          <button class="button button-primary button-wide" type="submit"><span>进入工作台</span><span aria-hidden="true">→</span></button>
+          <p id="login-message" class="form-message" role="alert"></p>
+        </form>
+      </section>
+
+      <section id="workspace-view" class="workspace-view hidden">
+        <div class="workspace-heading">
+          <div>
+            <p class="eyebrow">PRODUCT CATALOG / OVERVIEW</p>
+            <h1>商品目录</h1>
+            <p class="section-description">查询当前开发数据库中的商品，并验证每次变更是否正确落库。</p>
+          </div>
+          <button id="refresh-button" class="button button-secondary" type="button"><span aria-hidden="true">↻</span>刷新目录</button>
+        </div>
+
+        <div class="toolbar">
+          <form id="search-form" class="search-form">
+            <label class="sr-only" for="search-keyword">搜索商品名称</label>
+            <input id="search-keyword" class="text-input" type="search" placeholder="按商品名称搜索" autocomplete="off">
+            <label class="sr-only" for="search-max-price">最高价格</label>
+            <input id="search-max-price" class="text-input price-input" type="number" min="0" step="0.01" placeholder="最高价格">
+            <button class="button button-dark" type="submit"><span aria-hidden="true">⌕</span>搜索</button>
+          </form>
+          <button id="new-item-button" class="button button-primary" type="button"><span aria-hidden="true">＋</span>新增商品</button>
+        </div>
+
+        <div id="workspace-message" class="workspace-message" role="status"></div>
+
+        <div class="catalog-meta">
+          <div><span class="meta-label">当前结果</span><strong id="result-count">0</strong><span>件商品</span></div>
+          <span id="last-updated" class="muted-text">尚未刷新</span>
+        </div>
+
+        <div id="catalog-list" class="catalog-list" aria-live="polite"></div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="item-dialog" class="item-dialog">
+    <form id="item-form" method="dialog">
+      <div class="dialog-heading">
+        <div>
+          <p class="eyebrow">CATALOG RECORD</p>
+          <h2 id="dialog-title">新增商品</h2>
+        </div>
+        <button id="close-dialog-button" class="icon-button" type="button" aria-label="关闭弹窗" title="关闭">×</button>
+      </div>
+      <input id="item-mode" type="hidden" value="create">
+      <label class="field-label" for="item-id">商品 ID</label>
+      <input id="item-id" class="text-input" type="number" min="1" required>
+      <label class="field-label" for="item-name">商品名称</label>
+      <input id="item-name" class="text-input" type="text" maxlength="100" required>
+      <label class="field-label" for="item-price">价格</label>
+      <input id="item-price" class="text-input" type="number" min="0.01" step="0.01" required>
+      <label class="field-label" for="item-category">分类</label>
+      <input id="item-category" class="text-input" type="text" maxlength="40" required>
+      <p id="item-message" class="form-message" role="alert"></p>
+      <div class="dialog-actions">
+        <button id="cancel-dialog-button" class="button button-secondary" type="button">取消</button>
+        <button class="button button-primary" type="submit">保存商品</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="/app/app.js" defer></script>
+</body>
+</html>
