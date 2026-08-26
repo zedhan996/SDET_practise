@@ -102,6 +102,50 @@ TOOL_ERROR          未预期的工具内部错误
 
 权限和参数检查失败时，业务处理函数不会执行。超时返回后，调用结果也不会被当成成功结果使用。
 
+## Tool Calling 分层
+
+当前代码已经把 Agent 拆成两层：
+
+```text
+Planner
+    负责理解用户任务并生成 ToolCall
+
+ToolCallingAgent
+    负责把 ToolCall 交给 ToolRegistry
+
+ToolRegistry
+    负责白名单、权限、Schema、超时和实际执行
+```
+
+当前的 `OfflineQueryPlanner` 用规则模拟模型。以后接入真实模型时，只替换 Planner：
+
+```text
+规则 Planner
+离线 Stub Planner
+真实模型 Planner
+        ↓ 都生成 ToolCall
+同一个 ToolCallingAgent
+        ↓
+同一个 ToolRegistry
+```
+
+这样模型只能提出调用意图，不能绕过程序直接执行 Python 函数。测开可以分别验证 Planner 的工具选择，以及 Executor 的安全边界。
+
+### 原始模型输出的二次解析
+
+模型适配器通常返回字典或 JSON，而不是项目内部的 `ToolCall`。`parse_tool_call()` 负责把它转换为受控对象：
+
+```text
+检查顶层对象
+→ 只允许 tool_name 和 arguments
+→ 检查工具名称是非空字符串
+→ 检查 arguments 是对象
+→ 由应用程序注入权限和 trace_id
+→ 创建 ToolCall
+```
+
+模型不能自行提交 `permissions`、`trace_id` 或其他执行控制字段。即使模型输出看起来是合法 JSON，也必须经过这一步解析，再交给 `ToolRegistry` 做工具白名单和参数 Schema 校验。
+
 ## 当前代码与测试
 
 ```text

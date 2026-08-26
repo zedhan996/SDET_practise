@@ -2,10 +2,13 @@ import time
 
 from agent_mvp import (
     OfflineQueryAgent,
+    OfflineQueryPlanner,
     ToolCall,
+    ToolCallingAgent,
     ToolRegistry,
     ToolSpec,
     build_catalog_registry,
+    parse_tool_call,
 )
 
 
@@ -130,6 +133,83 @@ def test_offline_agent_maps_item_id_query_to_get_tool():
     assert result.trace.tool_name == "get_item"
 
 
+def test_planner_only_creates_a_tool_call_without_executing_it():
+    call = OfflineQueryPlanner().plan(
+        "请查询商品 ID 101",
+        READ_PERMISSION,
+        trace_id="planner-001",
+    )
+
+    assert isinstance(call, ToolCall)
+    assert call.tool_name == "get_item"
+    assert call.arguments == {"item_id": 101}
+    assert call.trace_id == "planner-001"
+
+
+def test_parser_converts_model_style_dict_to_tool_call():
+    call = parse_tool_call(
+        {"tool_name": "get_item", "arguments": {"item_id": 101}},
+        READ_PERMISSION,
+        trace_id="parser-001",
+    )
+
+    assert isinstance(call, ToolCall)
+    assert call.tool_name == "get_item"
+    assert call.arguments == {"item_id": 101}
+    assert call.permissions == READ_PERMISSION
+    assert call.trace_id == "parser-001"
+
+
+def test_parser_does_not_accept_model_supplied_permissions():
+    try:
+        parse_tool_call(
+            {
+                "tool_name": "get_item",
+                "arguments": {"item_id": 101},
+                "permissions": ["catalog:read"],
+            },
+            frozenset(),
+            trace_id="parser-002",
+        )
+    except Exception as exc:
+        assert getattr(exc, "error_type", None) == "INVALID_ARGUMENT"
+    else:
+        raise AssertionError("model-supplied permissions must be rejected")
+
+
+def test_parser_rejects_missing_or_wrongly_typed_fields():
+    invalid_calls = [
+        {"arguments": {"item_id": 101}},
+        {"tool_name": "get_item"},
+        {"tool_name": 123, "arguments": {}},
+        {"tool_name": "get_item", "arguments": []},
+    ]
+
+    for raw_call in invalid_calls:
+        try:
+            parse_tool_call(raw_call, READ_PERMISSION, trace_id="parser-invalid")
+        except Exception as exc:
+            assert getattr(exc, "error_type", None) == "INVALID_ARGUMENT"
+        else:
+            raise AssertionError(f"invalid call was accepted: {raw_call}")
+
+
+def test_tool_calling_agent_can_parse_a_dict_from_a_model_adapter():
+    class ModelStylePlanner:
+        def plan(self, _user_text, _permissions, _trace_id):
+            return {"tool_name": "get_item", "arguments": {"item_id": 102}}
+
+    result = ToolCallingAgent(planner=ModelStylePlanner()).run(
+        "查询商品",
+        READ_PERMISSION,
+        trace_id="model-adapter-001",
+    )
+
+    assert result.ok is True
+    assert result.data["data"]["id"] == 102
+    assert result.trace.trace_id == "model-adapter-001"
+
+
 def test_offline_agent_maps_search_query_to_search_tool():
     result = OfflineQueryAgent().run(
         "帮我查找 6000 元以内的 iPhone",
@@ -141,3 +221,27 @@ def test_offline_agent_maps_search_query_to_search_tool():
     assert result.data["total"] == 1
     assert result.data["data"][0]["id"] == 101
     assert result.trace.tool_name == "search_items"
+
+
+def test_tool_calling_agent_accepts_a_replaceable_planner():
+    class StubPlanner:
+        def plan(self, _user_text, permissions, trace_id):
+            return ToolCall("get_item", {"item_id": 103}, trace_id, permissions)
+
+    result = ToolCallingAgent(planner=StubPlanner()).run(
+        "任意输入",
+        READ_PERMISSION,
+        trace_id="stub-planner-001",
+    )
+
+    assert result.ok is True
+    assert result.data["data"]["id"] == 103
+    assert result.trace.trace_id == "stub-planner-001"
+
+
+def test_planner_failure_is_returned_as_a_structured_error():
+    result = ToolCallingAgent().run("", READ_PERMISSION, trace_id="planner-error-001")
+
+    assert result.ok is False
+    assert result.error_type == "INVALID_ARGUMENT"
+    assert result.trace.tool_name == "planner"

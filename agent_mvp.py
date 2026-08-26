@@ -52,6 +52,38 @@ class ToolCall:
     permissions: PermissionSet = field(default_factory=frozenset)
 
 
+def parse_tool_call(
+    raw_call: Mapping[str, Any],
+    permissions: PermissionSet,
+    trace_id: str | None = None,
+) -> ToolCall:
+    """把模型风格的字典解析为受控的 ToolCall。"""
+    if not isinstance(raw_call, Mapping):
+        raise ToolExecutionError("INVALID_ARGUMENT", "tool call must be an object")
+
+    # 权限和 trace 由应用程序注入，不能接受模型在输出中自行声明。
+    allowed_fields = {"tool_name", "arguments"}
+    unknown_fields = sorted(set(raw_call) - allowed_fields)
+    if unknown_fields:
+        raise ToolExecutionError(
+            "INVALID_ARGUMENT", f"unknown tool call field(s): {', '.join(unknown_fields)}"
+        )
+
+    tool_name = raw_call.get("tool_name")
+    arguments = raw_call.get("arguments")
+    if not isinstance(tool_name, str) or not tool_name.strip():
+        raise ToolExecutionError("INVALID_ARGUMENT", "tool_name must be a non-empty string")
+    if not isinstance(arguments, Mapping):
+        raise ToolExecutionError("INVALID_ARGUMENT", "arguments must be an object")
+
+    return ToolCall(
+        tool_name=tool_name,
+        arguments=dict(arguments),
+        trace_id=trace_id or uuid.uuid4().hex,
+        permissions=permissions,
+    )
+
+
 @dataclass(frozen=True)
 class TraceEvent:
     """记录一次调用的最小定位证据。"""
@@ -318,10 +350,52 @@ def build_catalog_registry() -> ToolRegistry:
     )
 
 
-class OfflineQueryAgent:
-    """用简单规则模拟模型，先验证工具边界而不是模型能力。"""
+class OfflineQueryPlanner:
+    """用简单规则模拟模型，只负责生成 ToolCall，不执行工具。"""
 
-    def __init__(self, registry: ToolRegistry | None = None):
+    def plan(
+        self,
+        user_text: str,
+        permissions: PermissionSet,
+        trace_id: str | None = None,
+    ) -> ToolCall:
+        """把用户文字解析为结构化调用计划。"""
+        trace_id = trace_id or uuid.uuid4().hex
+        if not isinstance(user_text, str) or not user_text.strip():
+            raise ToolExecutionError("INVALID_ARGUMENT", "user_text is required")
+
+        text = user_text.strip()
+        # 这是 MVP 的“文字识别”环节：用规则提取 ID 或价格，不代表真实模型理解。
+        item_match = re.search(r"(?:商品\s*ID|item\s*id|id)\s*[:：]?\s*(\d+)", text, re.I)
+        if item_match:
+            return ToolCall(
+                "get_item",
+                {"item_id": int(item_match.group(1))},
+                trace_id,
+                permissions,
+            )
+
+        max_price_match = re.search(r"(\d+(?:\.\d+)?)\s*元(?:以内|以下)", text)
+        max_price = float(max_price_match.group(1)) if max_price_match else None
+        keyword = re.sub(r"(帮我|请|查询|查找|搜索|商品|价格|\d+(?:\.\d+)?\s*元(?:以内|以下)?)", "", text)
+        keyword = re.sub(r"\s+", " ", keyword).strip(" 的") or None
+        return ToolCall(
+            "search_items",
+            {"keyword": keyword, "max_price": max_price},
+            trace_id,
+            permissions,
+        )
+
+
+class ToolCallingAgent:
+    """把 Planner 产出的 ToolCall 交给受控执行器。"""
+
+    def __init__(
+        self,
+        planner: OfflineQueryPlanner | None = None,
+        registry: ToolRegistry | None = None,
+    ):
+        self.planner = planner or OfflineQueryPlanner()
         self.registry = registry or build_catalog_registry()
 
     def run(
@@ -330,45 +404,41 @@ class OfflineQueryAgent:
         permissions: PermissionSet,
         trace_id: str | None = None,
     ) -> ToolExecutionResult:
-        """解析两种简单查询，生成 ToolCall 后交给统一执行器。"""
-        if not isinstance(user_text, str) or not user_text.strip():
-            call = ToolCall("search_items", {}, trace_id or uuid.uuid4().hex, permissions)
-            return self.registry._failure(
-                call, time.perf_counter(), "INVALID_ARGUMENT", "user_text is required"
+        """先规划调用，再统一执行；Planner 不拥有工具执行权限。"""
+        started_at = time.perf_counter()
+        trace_id = trace_id or uuid.uuid4().hex
+        try:
+            planned = self.planner.plan(user_text, permissions, trace_id)
+            # 兼容两种 Planner：内部 Stub 可直接返回 ToolCall，模型适配器通常返回 dict。
+            call = (
+                planned
+                if isinstance(planned, ToolCall)
+                else parse_tool_call(planned, permissions, trace_id)
             )
+        except ToolExecutionError as exc:
+            # 规划阶段失败时也返回统一结果，方便上层按错误类型处理。
+            call = ToolCall("planner", {}, trace_id, permissions)
+            return self.registry._failure(call, started_at, exc.error_type, exc.message)
 
-        text = user_text.strip()
-        # 这是 MVP 的“文字识别”环节：用规则提取 ID 或价格，不代表真实模型理解。
-        item_match = re.search(r"(?:商品\s*ID|item\s*id|id)\s*[:：]?\s*(\d+)", text, re.I)
-        if item_match:
-            call = ToolCall(
-                "get_item",
-                {"item_id": int(item_match.group(1))},
-                trace_id or uuid.uuid4().hex,
-                permissions,
-            )
-            return self.registry.execute(call)
-
-        max_price_match = re.search(r"(\d+(?:\.\d+)?)\s*元(?:以内|以下)", text)
-        max_price = float(max_price_match.group(1)) if max_price_match else None
-        keyword = re.sub(r"(帮我|请|查询|查找|搜索|商品|价格|\d+(?:\.\d+)?\s*元(?:以内|以下)?)", "", text)
-        keyword = re.sub(r"\s+", " ", keyword).strip(" 的") or None
-        call = ToolCall(
-            "search_items",
-            {"keyword": keyword, "max_price": max_price},
-            trace_id or uuid.uuid4().hex,
-            permissions,
-        )
         return self.registry.execute(call)
+
+
+class OfflineQueryAgent(ToolCallingAgent):
+    """兼容旧名称的离线 Agent，实际由 Planner 和 Executor 两层组成。"""
+
+    pass
 
 
 __all__ = [
     "GET_ITEM_SCHEMA",
     "SEARCH_ITEMS_SCHEMA",
+    "OfflineQueryPlanner",
     "OfflineQueryAgent",
+    "parse_tool_call",
     "ToolCall",
     "ToolExecutionError",
     "ToolExecutionResult",
+    "ToolCallingAgent",
     "ToolRegistry",
     "ToolSpec",
     "TraceEvent",
