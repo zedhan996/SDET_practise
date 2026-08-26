@@ -115,6 +115,8 @@ CLI 本身的测试位于 `test_qa_tool.py`，覆盖帮助信息、环境检查�
 |-- smoke_http.py     需要真实服务的 HTTP Smoke 测试
 |-- qa_tool.py        测试效能 CLI 工具
 |-- test_qa_tool.py   CLI 工具自身的测试
+|-- agent_mvp.py      Agent 工具调用 MVP 和商品查询工具
+|-- test_agent_mvp.py Agent MVP 的契约、边界和 trace 测试
 |-- logging.ini       Uvicorn 带时间戳的日志格式配置
 |-- pytest.ini        pytest 与 Playwright 失败产物配置
 |-- conftest.py       TestClient、数据库和鉴权等 Fixture
