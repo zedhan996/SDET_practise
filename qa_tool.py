@@ -1,4 +1,4 @@
-"""项目测试效能 CLI：提供环境检查和 pytest 快速筛选。"""
+"""项目辅助 CLI：检查运行环境并筛选 pytest 用例。"""
 
 import argparse
 import os

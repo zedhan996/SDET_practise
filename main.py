@@ -16,20 +16,17 @@ import uuid
 
 logger = logging.getLogger("app.request")
 
-# ==============================================================================
-# JWT 加密与鉴权配置 (大厂 6.0 标准)
-# ==============================================================================
-# 满足 RFC 7518 规范：HS256 算法秘钥长度必须 >= 32 字节 (32 字符)
+# JWT 签名与鉴权配置。部署时应为 APP_SECRET_KEY 提供至少 32 字节的随机密钥。
 SECRET_KEY = os.getenv("APP_SECRET_KEY")
 if not SECRET_KEY:
     raise RuntimeError("APP_SECRET_KEY environment variable is required")
 
-ALGORITHM = "HS256"                       # HMAC-SHA256 对称加密算法
-ACCESS_TOKEN_EXPIRE_MINUTES = 30           # Token 有效期 30 分钟
+ALGORITHM = "HS256"  # HMAC-SHA256 签名算法
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
 WEB_AUTH_COOKIE = "web_access_token"
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
-    """生成带有过期时间的 JWT Token (使用 timezone.utc 代替已弃用的 utcnow)"""
+    """生成包含过期时间的 JWT。"""
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
@@ -40,9 +37,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-# ==============================================================================
-# 5.0 SQLite 数据库与 ORM 级持久化配置 (SQLAlchemy)
-# ==============================================================================
+# 根据运行环境隔离开发数据库与测试数据库。
 APP_ENV = os.getenv("APP_ENV", "development")
 if APP_ENV == "testing":
     DATABASE_URL = os.getenv(
@@ -55,12 +50,10 @@ else:
         "sqlite:///./dev.db",
     )
 
-# 创建数据库引擎
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-# 定义数据库物理表 ORM 模型：items 表
 class ItemModel(Base):
     __tablename__ = "items"
 
@@ -69,10 +62,8 @@ class ItemModel(Base):
     price = Column(Float)
     category = Column(String)
 
-# 创建物理数据库表结构
 Base.metadata.create_all(bind=engine)
 
-# 依赖注入：每个请求自动获取与关闭 DB 会话
 def get_db():
     db = SessionLocal()
     try:
@@ -80,7 +71,7 @@ def get_db():
     finally:
         db.close()
 
-# 数据库种子数据初始化（若表为空，则注入初始数据 101, 102, 103）
+# 数据库为空时写入固定种子数据，供接口演示和测试使用。
 def init_db():
     db = SessionLocal()
     try:
@@ -97,10 +88,7 @@ def init_db():
 
 init_db()
 
-# ==============================================================================
-# 应用系统定义
-# ==============================================================================
-app = FastAPI(title="用户与商城模拟系统", description="完整 CRUD、JWT Token 鉴权、Mock 故障注入与 SQLite ORM 双重断言靶场")
+app = FastAPI(title="用户与商城模拟系统", description="商品目录与支付接口测试服务")
 
 
 @app.middleware("http")
@@ -137,13 +125,13 @@ async def request_logging_middleware(request, call_next):
 FRONTEND_DIR = Path(__file__).resolve().parent / "frontend"
 app.mount("/app", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
 
-# 模拟的用户数据库 (用于登录校验与角色判断)
+# 演示环境使用的内存用户数据。
 fake_db = {
     "admin": {"password": "Admin@123", "role": "admin"},
     "testuser": {"password": "test1234", "role": "user"}
 }
 
-# 静态管理员 Token 保留（兼容旧版 Header 测试）
+# 保留静态管理员 Token，以兼容旧版 x-token 测试。
 ADMIN_SECRET_TOKEN = os.getenv("APP_ADMIN_TOKEN")
 
 class LoginRequest(BaseModel):
@@ -192,9 +180,8 @@ def decode_access_token(token: str) -> dict:
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token credential.")
 
-# 模拟第三方支付 SDK/网关调用函数 (供 Pytest Mock 打桩使用)
 def call_third_party_payment(order_id: str, amount: float):
-    """模拟真实发起的外部网络 HTTP 请求"""
+    """第三方支付调用边界；当前返回本地模拟结果，供测试注入异常。"""
     return {
         "code": 200,
         "trade_no": f"WX_PAY_{order_id}_888",
@@ -207,10 +194,9 @@ def read_root():
 
 @app.post("/login")
 def login(request: LoginRequest):
-    """用户登录接口 (POST - 校验凭证并发放 JWT Token)"""
+    """校验用户凭证并签发 JWT。"""
     user, user_info = authenticate_credentials(request)
 
-    # 登录成功：颁发带有用户名和角色权限的真正 JWT Token
     access_token = create_access_token(data={"sub": user, "role": user_info["role"]})
     return {
         "status": "success", 
@@ -262,10 +248,9 @@ def web_logout(response: Response):
     response.delete_cookie(key=WEB_AUTH_COOKIE, path="/")
     return {"status": "success", "message": "Logged out"}
 
-# --- 静态查询接口 (查 ORM 数据库) ---
 @app.get("/items/search")
 def search_items(keyword: Optional[str] = None, max_price: Optional[float] = None, db: Session = Depends(get_db)):
-    """搜索商品列表 (GET - 查数据库物理表)"""
+    """按关键词和最高价格筛选商品。"""
     if max_price is not None and max_price <= 0:
         raise HTTPException(status_code=400, detail="max_price must be greater than 0")
 
@@ -279,10 +264,9 @@ def search_items(keyword: Optional[str] = None, max_price: Optional[float] = Non
     results = [{"id": item.id, "name": item.name, "price": item.price, "category": item.category} for item in items]
     return {"status": "success", "total": len(results), "data": results}
 
-# --- 新增商品接口 (POST - 写入数据库物理表) ---
 @app.post("/items", status_code=201)
 def create_item(item_in: ItemCreate, db: Session = Depends(get_db)):
-    """新增商品 (POST - 持久化写入 SQLite)"""
+    """新增商品并持久化到数据库。"""
     existing_item = db.query(ItemModel).filter(ItemModel.id == item_in.id).first()
     if existing_item:
         raise HTTPException(status_code=400, detail=f"Item ID {item_in.id} already exists")
@@ -298,10 +282,9 @@ def create_item(item_in: ItemCreate, db: Session = Depends(get_db)):
         "data": {"id": new_item.id, "name": new_item.name, "price": new_item.price, "category": new_item.category}
     }
 
-# --- 动态单体查询接口 (查 ORM 数据库) ---
 @app.get("/items/{item_id}")
 def get_item_by_id(item_id: int, db: Session = Depends(get_db)):
-    """根据商品 ID 获取详情 (GET - 查数据库)"""
+    """根据商品 ID 查询详情。"""
     db_item = db.query(ItemModel).filter(ItemModel.id == item_id).first()
     if not db_item:
         raise HTTPException(status_code=404, detail=f"Item {item_id} not found")
@@ -311,10 +294,9 @@ def get_item_by_id(item_id: int, db: Session = Depends(get_db)):
         "data": {"id": db_item.id, "name": db_item.name, "price": db_item.price, "category": db_item.category}
     }
 
-# --- 修改商品接口 (PUT - 更新数据库) ---
 @app.put("/items/{item_id}")
 def update_item(item_id: int, item_update: ItemUpdate, db: Session = Depends(get_db)):
-    """修改商品信息 (PUT - 更新数据库)"""
+    """修改商品名称或价格。"""
     db_item = db.query(ItemModel).filter(ItemModel.id == item_id).first()
     if not db_item:
         raise HTTPException(status_code=404, detail=f"Item {item_id} not found")
@@ -335,7 +317,6 @@ def update_item(item_id: int, item_update: ItemUpdate, db: Session = Depends(get
         "data": {"id": db_item.id, "name": db_item.name, "price": db_item.price, "category": db_item.category}
     }
 
-# --- 删除商品接口 (DELETE - 从数据库删除 + JWT Token / Header 鉴权) ---
 @app.delete("/items/{item_id}", status_code=204)
 def delete_item(
     item_id: int, 
@@ -344,10 +325,10 @@ def delete_item(
     web_access_token: Optional[str] = Cookie(None),
     db: Session = Depends(get_db)
 ):
-    """管理员删除商品 (支持 JWT Bearer Token 校验与角色权限验证)"""
+    """校验身份和管理员角色后删除商品。"""
     user_role = None
     
-    # 优先解析 JWT Bearer Token (标准大厂流程)
+    # 优先使用 Authorization 请求头中的 Bearer JWT。
     if authorization and authorization.startswith("Bearer "):
         token = authorization.split(" ")[1]
         payload = decode_access_token(token)
@@ -355,13 +336,13 @@ def delete_item(
     elif web_access_token:
         payload = decode_access_token(web_access_token)
         user_role = payload.get("role")
-    # 备选：旧版静态 x-token 兼容
+    # 兼容旧版静态 x-token 鉴权。
     elif ADMIN_SECRET_TOKEN and x_token == ADMIN_SECRET_TOKEN:
         user_role = "admin"
     else:
         raise HTTPException(status_code=401, detail="Missing or invalid authentication token in request header")
 
-    # 角色权限判断 (RBAC 越权控制)：非 admin 角色无权删除
+    # RBAC 权限检查：只有 admin 角色可以删除商品。
     if user_role != "admin":
         raise HTTPException(status_code=403, detail="Forbidden: Admin role required for deletion")
         
@@ -373,10 +354,9 @@ def delete_item(
     db.commit()
     return Response(status_code=204)
 
-# --- 订单支付接口 ---
 @app.post("/orders/pay")
 def pay_order(pay_req: PayRequest):
-    """订单支付接口"""
+    """处理支付请求，将下游超时和服务异常分别映射为 504 和 502。"""
     if pay_req.amount <= 0:
         raise HTTPException(status_code=400, detail="Payment amount must be greater than 0")
 

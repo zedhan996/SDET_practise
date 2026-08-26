@@ -20,7 +20,7 @@ def login_to_workspace(page: Page, base_url: str) -> None:
 
 
 def test_frontend_login_shows_catalog(page: Page, base_url: str) -> None:
-    """验证用户可以通过真实浏览器登录并进入商品目录工作台。"""
+    """验证登录成功后显示商品目录工作台。"""
     login_to_workspace(page, base_url)
 
     # 先确认打开的是项目业务页面，而不是错误页或 API 文档页。
