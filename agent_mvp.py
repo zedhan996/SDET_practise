@@ -110,6 +110,35 @@ class ToolExecutionResult:
         return asdict(self)
 
 
+@dataclass(frozen=True)
+class EvaluationCase:
+    """一条可版本化的 Agent 行为评测用例。"""
+
+    case_id: str
+    user_text: str
+    permissions: PermissionSet
+    expected_tool: str | None = None
+    expected_arguments: dict[str, Any] | None = None
+    expected_ok: bool = True
+    expected_error_type: str | None = None
+
+
+@dataclass(frozen=True)
+class EvaluationResult:
+    """一条评测用例的断言明细和实际执行结果。"""
+
+    case_id: str
+    passed: bool
+    checks: dict[str, bool]
+    actual_tool: str
+    actual_arguments: dict[str, Any]
+    result: ToolExecutionResult
+
+    def to_dict(self) -> dict[str, Any]:
+        """转换为适合保存为 JSON 报告的字典。"""
+        return asdict(self)
+
+
 def _is_number(value: Any) -> bool:
     """判断数值类型，同时排除 bool，因为 bool 是 int 的子类。"""
     return isinstance(value, (int, float)) and not isinstance(value, bool)
@@ -429,9 +458,61 @@ class OfflineQueryAgent(ToolCallingAgent):
     pass
 
 
+def evaluate_case(
+    case: EvaluationCase,
+    agent: ToolCallingAgent | None = None,
+) -> EvaluationResult:
+    """执行一条评测用例，并分别断言工具、参数、结果和 trace。"""
+    agent = agent or ToolCallingAgent()
+    trace_id = f"eval-{case.case_id}"
+    started_at = time.perf_counter()
+
+    try:
+        planned = agent.planner.plan(case.user_text, case.permissions, trace_id)
+        call = (
+            planned
+            if isinstance(planned, ToolCall)
+            else parse_tool_call(planned, case.permissions, trace_id)
+        )
+        result = agent.registry.execute(call)
+    except ToolExecutionError as exc:
+        # Planner 或原始输出解析失败时，也生成可比较的统一评测结果。
+        call = ToolCall("planner", {}, trace_id, case.permissions)
+        result = agent.registry._failure(call, started_at, exc.error_type, exc.message)
+
+    checks = {
+        "tool": case.expected_tool is None or call.tool_name == case.expected_tool,
+        "arguments": (
+            case.expected_arguments is None
+            or call.arguments == case.expected_arguments
+        ),
+        "ok": result.ok is case.expected_ok,
+        "error_type": result.error_type == case.expected_error_type,
+        "trace_id": result.trace.trace_id == trace_id,
+    }
+    return EvaluationResult(
+        case_id=case.case_id,
+        passed=all(checks.values()),
+        checks=checks,
+        actual_tool=call.tool_name,
+        actual_arguments=call.arguments,
+        result=result,
+    )
+
+
+def evaluate_cases(
+    cases: list[EvaluationCase],
+    agent: ToolCallingAgent | None = None,
+) -> list[EvaluationResult]:
+    """按顺序执行一批用例，供后续生成评测报告。"""
+    return [evaluate_case(case, agent) for case in cases]
+
+
 __all__ = [
     "GET_ITEM_SCHEMA",
     "SEARCH_ITEMS_SCHEMA",
+    "EvaluationCase",
+    "EvaluationResult",
     "OfflineQueryPlanner",
     "OfflineQueryAgent",
     "parse_tool_call",
@@ -443,4 +524,6 @@ __all__ = [
     "ToolSpec",
     "TraceEvent",
     "build_catalog_registry",
+    "evaluate_case",
+    "evaluate_cases",
 ]

@@ -146,6 +146,20 @@ ToolRegistry
 
 模型不能自行提交 `permissions`、`trace_id` 或其他执行控制字段。即使模型输出看起来是合法 JSON，也必须经过这一步解析，再交给 `ToolRegistry` 做工具白名单和参数 Schema 校验。
 
+## 评测 Harness
+
+`EvaluationCase` 将一条 Agent 评测用例固定为输入、权限和预期结果；`evaluate_case()` 会分别检查：
+
+```text
+工具名称
+工具参数
+成功/失败状态
+错误类型
+trace_id
+```
+
+`evaluate_cases()` 可以按顺序运行一批用例，后续还可以在不改变用例格式的情况下，替换 Planner、比较不同 Prompt 或接入真实模型。当前评测使用确定性断言，不使用 LLM Judge。
+
 ## 当前代码与测试
 
 ```text
