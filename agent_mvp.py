@@ -11,7 +11,7 @@ import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from dataclasses import asdict, dataclass, field
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, Mapping, Protocol
 
 from main import ItemModel, SessionLocal
 
@@ -19,6 +19,7 @@ from main import ItemModel, SessionLocal
 # 权限集合只保存权限名称，例如 catalog:read；调用工具前会检查它。
 PermissionSet = frozenset[str]
 ToolHandler = Callable[[dict[str, Any]], dict[str, Any]]
+TraceAwareToolHandler = Callable[[dict[str, Any], str], dict[str, Any]]
 
 
 class ToolExecutionError(Exception):
@@ -38,8 +39,9 @@ class ToolSpec:
     description: str
     input_schema: dict[str, Any]
     required_permission: str
-    handler: ToolHandler
+    handler: ToolHandler | TraceAwareToolHandler
     timeout_seconds: float = 1.0
+    pass_trace_id: bool = False
 
 
 @dataclass(frozen=True)
@@ -50,6 +52,19 @@ class ToolCall:
     arguments: dict[str, Any]
     trace_id: str
     permissions: PermissionSet = field(default_factory=frozenset)
+
+
+class ToolPlanner(Protocol):
+    """约束离线规则、测试Stub和真实模型Planner使用同一个接口。"""
+
+    def plan(
+        self,
+        user_text: str,
+        permissions: PermissionSet,
+        trace_id: str | None = None,
+    ) -> ToolCall | Mapping[str, Any]:
+        """根据用户文字提出结构化工具调用，但不执行工具。"""
+        ...
 
 
 def parse_tool_call(
@@ -287,7 +302,13 @@ class ToolRegistry:
 
         # 每次调用单独设置超时；超时结果不能继续被当作成功结果使用。
         executor = ThreadPoolExecutor(max_workers=1)
-        future = executor.submit(tool.handler, arguments)
+        # trace_id属于程序控制字段；仅对明确声明需要它的处理器内部注入。
+        handler_arguments = (
+            (arguments, call.trace_id)
+            if tool.pass_trace_id
+            else (arguments,)
+        )
+        future = executor.submit(tool.handler, *handler_arguments)
         try:
             data = future.result(timeout=tool.timeout_seconds)
         except FutureTimeoutError:
@@ -421,7 +442,7 @@ class ToolCallingAgent:
 
     def __init__(
         self,
-        planner: OfflineQueryPlanner | None = None,
+        planner: ToolPlanner | None = None,
         registry: ToolRegistry | None = None,
     ):
         self.planner = planner or OfflineQueryPlanner()
@@ -522,6 +543,7 @@ __all__ = [
     "ToolCallingAgent",
     "ToolRegistry",
     "ToolSpec",
+    "ToolPlanner",
     "TraceEvent",
     "build_catalog_registry",
     "evaluate_case",

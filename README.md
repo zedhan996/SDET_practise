@@ -117,6 +117,12 @@ CLI 本身的测试位于 `test_qa_tool.py`，覆盖帮助信息、环境检查�
 |-- test_qa_tool.py   CLI 工具自身的测试
 |-- agent_mvp.py      Agent 工具调用 MVP 和商品查询工具
 |-- test_agent_mvp.py Agent MVP 的契约、边界和 trace 测试
+|-- agent_rag.py      把受控 RAG 检索注册为 Agent 工具
+|-- agent_ollama.py   使用本机 Qwen 生成原生 Tool Calling 计划
+|-- rag_mvp.py        文档切分、Embedding、Chroma 写入和检索
+|-- rag_query.py      Top-k、Reranker 和拒答门禁查询入口
+|-- rag_generation.py Ollama 受控答案生成及上游错误映射
+|-- rag_answer.py     本地持久化知识库完整问答入口
 |-- logging.ini       Uvicorn 带时间戳的日志格式配置
 |-- pytest.ini        pytest 与 Playwright 失败产物配置
 |-- conftest.py       TestClient、数据库和鉴权等 Fixture

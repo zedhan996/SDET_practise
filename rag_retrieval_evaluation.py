@@ -5,12 +5,14 @@ from __future__ import annotations
 import os
 import uuid
 from dataclasses import dataclass
+from pathlib import Path
 
 from rag_mvp import (
     ChromaKnowledgeStore,
     KnowledgeDocument,
     build_sentence_transformer_embedding,
     index_documents,
+    load_knowledge_documents,
 )
 from rag_reranker import (
     CandidateReranker,
@@ -541,27 +543,8 @@ def format_evaluation_report(
 
 
 def build_evaluation_documents() -> list[KnowledgeDocument]:
-    """准备商品、鉴权和日志三个主题的最小评测知识库。"""
-    return [
-        KnowledgeDocument(
-            document_id="catalog-rule",
-            content="创建商品时，商品价格必须大于 0，不允许录入零或负数价格；合法创建成功返回 201。",
-            source="docs/catalog-rule.md",
-            version="v1",
-        ),
-        KnowledgeDocument(
-            document_id="auth-rule",
-            content="未携带或携带无效 JWT Bearer Token 返回 401；身份有效但权限不足返回 403。",
-            source="docs/auth-rule.md",
-            version="v1",
-        ),
-        KnowledgeDocument(
-            document_id="trace-rule",
-            content="每次请求使用 request_id 关联响应头、应用日志和错误堆栈，辅助 RCA 定位问题。",
-            source="docs/trace-rule.md",
-            version="v1",
-        ),
-    ]
+    """从真实Markdown文件加载商品、鉴权和日志三个主题的评测知识。"""
+    return load_knowledge_documents(Path(__file__).parent / "knowledge")
 
 
 def build_evaluation_cases() -> list[RetrievalEvaluationCase]:
@@ -571,35 +554,35 @@ def build_evaluation_cases() -> list[RetrievalEvaluationCase]:
             "positive-price-1",
             "正样本",
             "系统能不能保存负数金额的商品？",
-            "docs/catalog-rule.md",
+            "knowledge/catalog-rule.md",
             "calibration",
         ),
         RetrievalEvaluationCase(
             "positive-price-2",
             "语义改写",
             "录入商品时金额有什么限制？",
-            "docs/catalog-rule.md",
+            "knowledge/catalog-rule.md",
             "validation",
         ),
         RetrievalEvaluationCase(
             "positive-auth-1",
             "正样本",
             "没有登录令牌时接口应该返回什么？",
-            "docs/auth-rule.md",
+            "knowledge/auth-rule.md",
             "calibration",
         ),
         RetrievalEvaluationCase(
             "positive-auth-2",
             "语义改写",
             "用户身份正确但是权限不够是什么状态码？",
-            "docs/auth-rule.md",
+            "knowledge/auth-rule.md",
             "validation",
         ),
         RetrievalEvaluationCase(
             "positive-trace-1",
             "正样本",
             "如何关联一次请求的响应头和服务端日志？",
-            "docs/trace-rule.md",
+            "knowledge/trace-rule.md",
             "calibration",
         ),
         RetrievalEvaluationCase(

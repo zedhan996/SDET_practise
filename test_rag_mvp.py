@@ -5,6 +5,7 @@ from rag_mvp import (
     KnowledgeDocument,
     LocalHashEmbeddingFunction,
     index_documents,
+    load_knowledge_documents,
     split_document,
 )
 
@@ -131,3 +132,53 @@ def test_retrieve_rejects_invalid_query_arguments():
         assert str(exc) == "query must not be empty"
     else:
         raise AssertionError("invalid query was accepted")
+
+
+# 验证Markdown目录加载器会递归读取文件，并生成稳定来源、ID和版本元数据。
+def test_load_knowledge_documents_reads_markdown_files(tmp_path):
+    nested = tmp_path / "nested"
+    nested.mkdir()
+    (nested / "catalog.md").write_text("商品价格必须大于零。", encoding="utf-8")
+    (tmp_path / "ignored.txt").write_text("不应进入知识库", encoding="utf-8")
+
+    documents = load_knowledge_documents(tmp_path, version="v7")
+
+    assert len(documents) == 1
+    assert documents[0].document_id == "nested-catalog"
+    assert documents[0].source == f"{tmp_path.name}/nested/catalog.md"
+    assert documents[0].version == "v7"
+    assert documents[0].content == "商品价格必须大于零。"
+
+
+# 空Markdown会形成无意义向量，加载阶段应直接拒绝并指出问题文件。
+def test_load_knowledge_documents_rejects_empty_markdown(tmp_path):
+    (tmp_path / "empty.md").write_text("   ", encoding="utf-8")
+
+    try:
+        load_knowledge_documents(tmp_path)
+    except ValueError as exc:
+        assert "knowledge file must not be empty" in str(exc)
+        assert "empty.md" in str(exc)
+    else:
+        raise AssertionError("empty knowledge file was accepted")
+
+
+# 持久化模式重新创建Store后仍能读取原集合，证明索引不是只存在于内存。
+def test_persistent_store_reopens_existing_collection(tmp_path):
+    persist_directory = tmp_path / "chroma"
+    collection_name = f"persistent-test-{uuid.uuid4().hex}"
+    first_store = ChromaKnowledgeStore(
+        collection_name=collection_name,
+        embedding_function=LocalHashEmbeddingFunction(),
+        persist_directory=persist_directory,
+    )
+    index_documents(first_store, build_documents())
+
+    second_store = ChromaKnowledgeStore(
+        collection_name=collection_name,
+        embedding_function=LocalHashEmbeddingFunction(),
+        persist_directory=persist_directory,
+    )
+
+    assert second_store.count() == 2
+    assert any(persist_directory.iterdir())

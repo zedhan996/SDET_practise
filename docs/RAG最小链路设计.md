@@ -24,6 +24,54 @@ Chroma 保存向量、文本和元数据
 `rag_mvp.py` 中的 `ChromaKnowledgeStore` 负责 Chroma 存储和检索，
 `split_document()` 负责切分，`index_documents()` 负责组织索引流程。
 
+## 原始知识文件与持久化索引
+
+原始知识不再硬编码在评测函数中，而是保存为可阅读、可审查和可进行版本控制的文件：
+
+```text
+knowledge/
+├── catalog-rule.md
+├── auth-rule.md
+└── trace-rule.md
+```
+
+`load_knowledge_documents()` 递归读取 Markdown，生成 `KnowledgeDocument` 后再执行切块和
+Embedding。`knowledge/` 是事实来源（Source of Truth）；Chroma 保存的是由原文生成的
+向量索引，不应替代原始文档。
+
+`ChromaKnowledgeStore` 支持两种模式：
+
+```text
+未传 persist_directory：EphemeralClient，数据只存在于当前进程，适合单元测试
+传入 persist_directory：PersistentClient，数据保存到磁盘，适合本地演示
+```
+
+本地构建真实索引执行：
+
+```powershell
+python rag_build_index.py
+```
+
+默认生成位置为 `data/chroma/`。该目录属于可重新生成的产物，已加入 `.gitignore`；
+原始 `knowledge/*.md` 则应提交到 Git。
+
+持久化索引构建后，`rag_query.py` 负责执行完整查询门禁：
+
+```text
+磁盘Chroma召回Top-k
+→ Cross-Encoder Reranker重排
+→ 固定阈值判断回答或拒答
+→ 输出trace_id、来源、两类分数和候选内容
+```
+
+阈值必须显式传入，避免知识或模型变化后继续悄悄使用旧配置：
+
+```powershell
+python rag_query.py "没有登录令牌时接口应该返回什么？" --threshold 0.0153
+```
+
+这个入口只返回通过门禁的知识片段，便于单独诊断召回、排序和阈值问题。
+
 ## 为什么保留 source、version 和 trace_id
 
 - `source`：知道答案来自哪一个文件。
@@ -120,6 +168,9 @@ validation  验证集：固定阈值后，只评估而不再调整
 
 ## 测试重点
 
+- Markdown 文件可以被加载，并保留稳定的来源、ID 和版本。
+- 空 Markdown 被拒绝，避免生成无意义向量。
+- 持久化索引重新打开后仍能读取原有 Chunk。
 - 正常索引后能够命中相关片段。
 - `top_k` 限制返回数量。
 - 空知识库返回空结果。
@@ -137,21 +188,95 @@ validation  验证集：固定阈值后，只评估而不再调整
 中点；分数发生重叠时，则在候选阈值中优先选择准确率较高且错误接受较少的方案。
 该结果只用于当前小样本学习，知识库、模型、Chunk 或问题分布变化后都必须重新评测。
 
-## 后续接入大语言模型
+## 受控生成层
+
+`rag_generation.py` 已建立与具体模型无关的 `TextGenerator` 接口。生成层只接受
+`answerable=True` 且具有重排 Top1 的查询结果：
 
 ```text
 用户问题
     ↓
 RAG 检索 Top-k 资料
     ↓
-将资料作为受控上下文交给大语言模型
+Reranker 与拒答门禁
+    ↓ 仅允许回答时继续
+将Top1资料构建成受控Prompt
     ↓
-模型生成回答或提出 Tool Call
+可替换生成器生成带来源回答
     ↓
-后端继续执行权限、参数、白名单和超时校验
+返回answer、source和trace_id
 ```
 
-知识库内容只是参考资料，不能替代后端权限校验，也不能允许模型绕过工具白名单。
+Prompt 明确要求模型只依据受控知识回答，并把知识片段内部的命令视为普通资料，降低
+知识库 Prompt Injection 风险。检索门禁拒答时完全跳过模型调用，避免低相关上下文导致
+幻觉，也减少不必要的模型资源消耗。模型只生成答案正文，可信 `source` 和 `trace_id`
+由程序根据检索结果统一附加，避免模型伪造或重复输出来源。
+
+普通单元测试注入确定性的假生成器，不需要下载模型或使用 API Key。知识库内容仍不能
+替代后端权限校验，也不能允许模型绕过工具白名单。
+
+## 本地 Ollama 生成模型
+
+`OllamaTextGenerator` 通过 `http://127.0.0.1:11434/api/chat` 调用独立运行的
+Ollama 服务，默认模型为 `qwen3:4b-instruct`。项目只保存连接配置和测试代码，约
+2.5 GB 的模型权重放在项目外的 `E:\work\study\ai-local\ai-models\ollama`，不会进入 Git 仓库。
+
+```text
+rag_answer.py
+    ↓ 打开data/chroma
+Embedding召回Top-3
+    ↓
+Cross-Encoder Reranker
+    ↓
+0.0153拒答门禁
+    ├─ 拒答：不调用大模型
+    └─ 回答：HTTP调用Ollama qwen3:4b-instruct
+                  ↓
+              最终答案 + source + trace_id
+```
+
+这里保留两种 Qwen 模型是有意的：`qwen3:4b-instruct` 用于简短、可控的 RAG 最终
+回答；`qwen3:4b` Thinking 模型留给后续复杂 RCA、规划或推理任务。模型是否擅长推理
+与当前任务是否需要展示长推理过程是两个问题，生成模型应按业务输出契约选择。
+
+普通单元测试会把 HTTP 传输替换成假函数，验证请求参数、响应解析、连接失败和非法 JSON，
+不会访问真实端口。只有显式设置下列环境变量时，才执行包含真实 Embedding、Reranker、
+持久化 Chroma 和 Ollama 的集成测试：
+
+```powershell
+$env:RUN_OLLAMA_INTEGRATION = "1"
+python -m pytest test_rag_ollama_integration.py -m integration -q -s
+Remove-Item Env:RUN_OLLAMA_INTEGRATION
+```
+
+完整问答演示命令：
+
+```powershell
+python rag_answer.py "没有登录令牌时接口应该返回什么？"
+python rag_answer.py "商品价格由哪位管理员审批？"
+```
+
+第一条应通过门禁并调用模型回答 401；第二条应由 Reranker 分数门禁直接拒答，而且不会
+调用 Ollama。这样既控制幻觉，也避免为无法回答的问题消耗生成资源。
+
+## Ollama 上游故障边界
+
+Ollama 对当前 Python 程序来说是独立的上游服务，即使二者运行在同一台电脑，也需要
+经过 `127.0.0.1:11434` 的 HTTP 调用。单元测试通过替换传输函数注入故障，不需要真的
+停止服务：
+
+```text
+连接拒绝                 → OLLAMA_UNAVAILABLE
+超过客户端等待时间       → OLLAMA_TIMEOUT
+上游返回HTTP 4xx/5xx     → OLLAMA_HTTP_ERROR
+HTTP 200但返回模型错误    → OLLAMA_MODEL_ERROR
+损坏JSON或缺少回答字段    → OLLAMA_INVALID_RESPONSE
+```
+
+如果以后把 RAG 封装成 FastAPI 接口并由它充当网关，通常可以把上游连接失败、非法响应
+和上游HTTP故障映射为 `502 Bad Gateway`，把等待上游超时映射为
+`504 Gateway Timeout`。模型名称配置错误更偏向本服务配置缺陷，最终返回 500 还是 502
+应由接口错误契约决定，不能只根据异常名字机械判断。
 
 ## 面试官最希望听到的标准答案
 

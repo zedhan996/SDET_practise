@@ -10,6 +10,7 @@ import hashlib
 import math
 import uuid
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
 import chromadb
@@ -124,6 +125,40 @@ def build_sentence_transformer_embedding(
     )
 
 
+def load_knowledge_documents(
+    directory: str | Path,
+    version: str = "v1",
+) -> list[KnowledgeDocument]:
+    """从目录递归读取Markdown文件，并转换为可索引的原始知识文档。"""
+    knowledge_directory = Path(directory)
+    if not knowledge_directory.exists():
+        raise FileNotFoundError(f"knowledge directory not found: {knowledge_directory}")
+    if not knowledge_directory.is_dir():
+        raise NotADirectoryError(
+            f"knowledge path is not a directory: {knowledge_directory}"
+        )
+
+    documents: list[KnowledgeDocument] = []
+    for file_path in sorted(knowledge_directory.rglob("*.md")):
+        relative_path = file_path.relative_to(knowledge_directory)
+        content = file_path.read_text(encoding="utf-8").strip()
+        if not content:
+            raise ValueError(f"knowledge file must not be empty: {relative_path}")
+
+        # 使用相对路径生成稳定ID；source保留知识目录名，便于报告追踪原文件。
+        document_id = relative_path.with_suffix("").as_posix().replace("/", "-")
+        source = f"{knowledge_directory.name}/{relative_path.as_posix()}"
+        documents.append(
+            KnowledgeDocument(
+                document_id=document_id,
+                content=content,
+                source=source,
+                version=version,
+            )
+        )
+    return documents
+
+
 def split_document(
     document: KnowledgeDocument,
     chunk_size: int = 160,
@@ -163,11 +198,22 @@ class ChromaKnowledgeStore:
         client: Any | None = None,
         embedding_function: EmbeddingFunction[list[str]] | None = None,
         min_similarity: float | None = None,
+        persist_directory: str | Path | None = None,
     ):
         if min_similarity is not None and not -1.0 <= min_similarity <= 1.0:
             raise ValueError("min_similarity must be between -1 and 1")
+        if client is not None and persist_directory is not None:
+            raise ValueError("client and persist_directory cannot be used together")
         self.min_similarity = min_similarity
-        self.client = client or chromadb.EphemeralClient()
+        self.persist_directory = (
+            Path(persist_directory).resolve() if persist_directory is not None else None
+        )
+        if client is not None:
+            self.client = client
+        elif self.persist_directory is not None:
+            self.client = chromadb.PersistentClient(path=str(self.persist_directory))
+        else:
+            self.client = chromadb.EphemeralClient()
         self.collection = self.client.get_or_create_collection(
             name=collection_name,
             embedding_function=embedding_function or DefaultEmbeddingFunction(),
@@ -300,5 +346,6 @@ __all__ = [
     "RetrievalResult",
     "build_sentence_transformer_embedding",
     "index_documents",
+    "load_knowledge_documents",
     "split_document",
 ]

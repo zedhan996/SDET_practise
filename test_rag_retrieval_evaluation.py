@@ -4,6 +4,7 @@ from rag_retrieval_evaluation import (
     RerankerEvaluationResult,
     RetrievalEvaluationResult,
     build_evaluation_cases,
+    build_evaluation_documents,
     calculate_ranking_metrics,
     calibrate_reranker_threshold,
     calibrate_similarity_threshold,
@@ -206,3 +207,15 @@ def test_evaluation_cases_define_calibration_and_validation_splits():
         and any(case.expected_source is None for case in cases if case.dataset_split == split)
         for split in splits
     )
+
+
+# 真实评测知识必须来自knowledge目录中的Markdown，而不是评测函数内的硬编码文本。
+def test_evaluation_documents_are_loaded_from_markdown_files():
+    documents = build_evaluation_documents()
+
+    assert {document.source for document in documents} == {
+        "knowledge/catalog-rule.md",
+        "knowledge/auth-rule.md",
+        "knowledge/trace-rule.md",
+    }
+    assert all(document.content.startswith("# ") for document in documents)

@@ -131,6 +131,41 @@ ToolRegistry
 
 这样模型只能提出调用意图，不能绕过程序直接执行 Python 函数。测开可以分别验证 Planner 的工具选择，以及 Executor 的安全边界。
 
+项目现已增加 `agent_rag.py`，把现有 RAG 门禁注册为第三个只读工具：
+
+```text
+search_items       catalog:read     查询商品列表
+get_item           catalog:read     查询单个商品
+search_knowledge   knowledge:read   检索规则知识
+```
+
+`OfflineCatalogKnowledgePlanner` 使用确定性关键词完成商品问题与知识问题分流，继续作为
+稳定、快速的离线替身。知识工具会复用 Agent 生成的 `trace_id`，但拒答时不会把低相关
+候选内容交给后续模型；真实 Qwen 只替换 Planner，ToolRegistry 的白名单、Schema、
+权限和超时边界保持不变。
+
+## 真实 Qwen Planner
+
+`agent_ollama.py` 已经把本机 `qwen3:4b-instruct` 接到相同的 `ToolPlanner`
+接口。它通过 Ollama `/api/chat` 的原生 `tools` 和 `message.tool_calls` 完成一次工具选择：
+
+```text
+用户自然语言
+→ OllamaToolPlanner向Qwen提供三个工具Schema
+→ Qwen返回一个tool_call
+→ Planner只提取tool_name和arguments
+→ parse_tool_call由应用注入permissions与trace_id
+→ ToolRegistry重新检查白名单、权限、Schema和超时
+→ 执行真实工具
+```
+
+模型只拥有“提出计划”的能力。工具处理函数、调用者权限和 `trace_id` 不会发送给模型；
+即使模型编造工具、生成坏参数或选择了调用者无权使用的工具，最终也会被程序拒绝。
+当前 MVP 每轮只允许一个工具调用，多工具并行或多轮工具循环留到后续扩展。
+
+普通测试通过替换 HTTP 传输函数注入 Ollama 响应，不依赖服务和模型；真实模型测试使用
+`RUN_OLLAMA_INTEGRATION=1` 显式启用，避免普通回归和 CI 因本地服务状态而不稳定。
+
 ### 原始模型输出的二次解析
 
 模型适配器通常返回字典或 JSON，而不是项目内部的 `ToolCall`。`parse_tool_call()` 负责把它转换为受控对象：
@@ -179,26 +214,38 @@ test_agent_mvp.py
     超时
     trace
     两种自然语言查询路由
+
+agent_ollama.py
+    Ollama原生Tool Calling请求
+    模型tool_calls响应解析
+    规划阶段超时、连接失败和异常响应映射
+
+test_agent_ollama.py
+    工具Schema转换
+    权限与trace不发送给模型
+    白名单、权限和坏参数二次防线
+    无工具、多工具、超时和服务不可用
+
+test_agent_ollama_integration.py
+    真实Qwen商品工具选择
+    真实Qwen知识工具选择
 ```
 
 `OfflineQueryAgent` 是确定性的离线替身，不代表真实大模型。它只支持当前两个演示查询形式，用来先验证工具边界。后续接入真实模型时，需要继续验证模型选择工具和生成参数的正确率。
 
 ## 当前验证结果
 
-```text
-test_agent_mvp.py：10 passed
-```
+`test_agent_mvp.py` 与 `test_agent_rag.py` 分别覆盖基础工具边界和 Agent-RAG 分流；实际
+通过数量以当前测试命令输出为准，不在文档中长期保存容易过期的固定数字。
 
 当前还没有完成：
 
 ```text
-真实模型接入
-Tool Calling Agent
-RAG 检索
+多轮或并行Tool Calling循环
 MCP Server/Client
-Agent 评测 Harness
+不少于 15 个版本化评测 case 与聚合指标
 ```
 
 面试官最希望听到的标准答案：
 
-> 我先限定一个商品查询任务，开放商品搜索和商品详情两个只读工具，并为它们定义输入、输出、权限和错误 Schema。Agent 不能直接执行任意函数，而是只能从白名单选择工具；调用必须经过参数校验、权限校验和超时控制，并记录 trace、状态、耗时和错误类型。当前先用确定性的离线 Agent 验证工具边界，再接入真实模型、RAG 和 MCP，避免把模型不确定性与工具实现问题混在一起。
+> 我先用确定性的离线 Planner 验证工具白名单、参数、权限、超时和 trace，再通过 Ollama 原生 Tool Calling 接入 Qwen。模型只负责选择工具和生成参数，应用程序不会把权限和执行权交给模型；模型输出还要经过解析、Schema、白名单和权限二次校验。普通回归使用可注入的假传输保持稳定，真实模型行为由显式开启的集成测试验证。
