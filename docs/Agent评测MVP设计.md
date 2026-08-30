@@ -191,9 +191,16 @@ search_knowledge   knowledge:read   检索规则知识
 成功/失败状态
 错误类型
 trace_id
+指定的返回数据、内容关键字与RAG内部trace一致性
 ```
 
 `evaluate_cases()` 可以按顺序运行一批用例，后续还可以在不改变用例格式的情况下，替换 Planner、比较不同 Prompt 或接入真实模型。当前评测使用确定性断言，不使用 LLM Judge。
+
+新增的 `agent_evaluation.py` 从 `eval_cases/agent_rag_v1.json` 加载15条版本化任务，
+复用 `evaluate_case()` 并增加处理函数调用次数检查、聚合指标和JSON/Markdown报告。
+`end_to_end_ms` 记录Planner到Registry结果的耗时，不再把工具trace耗时当作完整链路耗时。
+默认使用固定依赖，不代表真实语义检索质量；人工复核初始为待完成。
+运行方式和证据边界见 [Agent与RAG版本化评测说明](Agent与RAG版本化评测说明.md)。
 
 ## 当前代码与测试
 
@@ -243,8 +250,12 @@ test_agent_ollama_integration.py
 ```text
 多轮或并行Tool Calling循环
 MCP Server/Client
-不少于 15 个版本化评测 case 与聚合指标
+Prompt A/B比较与评测指标CI退化门禁
 ```
+
+2026-08-31阶段记录：用户已运行15条版本化评测，离线与真实Qwen Planner两轮均通过，
+每轮选定的5条复核项已按用户反馈补录。详细指标、查询改写和固定依赖的证据边界见
+[Agent与RAG评测人工复核记录](Agent与RAG评测人工复核记录_20260831.md)。
 
 面试官最希望听到的标准答案：
 

@@ -11,9 +11,10 @@ import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from dataclasses import asdict, dataclass, field
-from typing import Any, Callable, Mapping, Protocol
+from typing import TYPE_CHECKING, Any, Callable, Mapping, Protocol
 
-from main import ItemModel, SessionLocal
+if TYPE_CHECKING:
+    from main import ItemModel
 
 
 # 权限集合只保存权限名称，例如 catalog:read；调用工具前会检查它。
@@ -136,6 +137,8 @@ class EvaluationCase:
     expected_arguments: dict[str, Any] | None = None
     expected_ok: bool = True
     expected_error_type: str | None = None
+    expected_data: dict[str, Any] | None = None
+    expected_content_terms: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -148,6 +151,8 @@ class EvaluationResult:
     actual_tool: str
     actual_arguments: dict[str, Any]
     result: ToolExecutionResult
+    tool_call_attempted: bool = False
+    end_to_end_ms: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
         """转换为适合保存为 JSON 报告的字典。"""
@@ -222,6 +227,9 @@ def _item_to_dict(item: ItemModel) -> dict[str, Any]:
 
 def search_items_tool(arguments: dict[str, Any]) -> dict[str, Any]:
     """复用项目真实 SQLite 数据库的只读商品搜索能力。"""
+    # 仅在实际查询时导入数据库，离线评测导入本模块不会初始化dev.db。
+    from main import ItemModel, SessionLocal
+
     keyword = arguments.get("keyword")
     max_price = arguments.get("max_price")
     if max_price is not None and max_price <= 0:
@@ -243,6 +251,8 @@ def search_items_tool(arguments: dict[str, Any]) -> dict[str, Any]:
 
 def get_item_tool(arguments: dict[str, Any]) -> dict[str, Any]:
     """复用项目真实 SQLite 数据库的商品详情查询能力。"""
+    from main import ItemModel, SessionLocal
+
     db = SessionLocal()
     try:
         item = db.query(ItemModel).filter(ItemModel.id == arguments["item_id"]).first()
@@ -479,14 +489,34 @@ class OfflineQueryAgent(ToolCallingAgent):
     pass
 
 
+def _matches_expected_data(actual: Any, expected: Any) -> bool:
+    """字典按指定字段检查，列表按顺序和长度检查，并区分布尔值与数值。"""
+    if isinstance(expected, Mapping):
+        return isinstance(actual, Mapping) and all(
+            key in actual and _matches_expected_data(actual[key], value)
+            for key, value in expected.items()
+        )
+    if isinstance(expected, list):
+        return (
+            isinstance(actual, list)
+            and len(actual) == len(expected)
+            and all(_matches_expected_data(a, e) for a, e in zip(actual, expected))
+        )
+    if expected is None or isinstance(expected, bool):
+        return actual is expected
+    return not isinstance(actual, bool) and actual == expected
+
+
 def evaluate_case(
     case: EvaluationCase,
     agent: ToolCallingAgent | None = None,
+    trace_id: str | None = None,
 ) -> EvaluationResult:
-    """执行一条评测用例，并分别断言工具、参数、结果和 trace。"""
+    """执行一次完整规划和工具调用，再独立检查预期，避免执行器读取答案。"""
     agent = agent or ToolCallingAgent()
-    trace_id = f"eval-{case.case_id}"
+    trace_id = trace_id or f"eval-{case.case_id}"
     started_at = time.perf_counter()
+    tool_call_attempted = False
 
     try:
         planned = agent.planner.plan(case.user_text, case.permissions, trace_id)
@@ -495,12 +525,16 @@ def evaluate_case(
             if isinstance(planned, ToolCall)
             else parse_tool_call(planned, case.permissions, trace_id)
         )
+        tool_call_attempted = True
         result = agent.registry.execute(call)
     except ToolExecutionError as exc:
         # Planner 或原始输出解析失败时，也生成可比较的统一评测结果。
         call = ToolCall("planner", {}, trace_id, case.permissions)
         result = agent.registry._failure(call, started_at, exc.error_type, exc.message)
 
+    # 这个耗时包含Planner和Registry，不再把单独的工具trace耗时当成端到端耗时。
+    end_to_end_ms = (time.perf_counter() - started_at) * 1000
+    content = result.data.get("content") if isinstance(result.data, Mapping) else None
     checks = {
         "tool": case.expected_tool is None or call.tool_name == case.expected_tool,
         "arguments": (
@@ -510,6 +544,19 @@ def evaluate_case(
         "ok": result.ok is case.expected_ok,
         "error_type": result.error_type == case.expected_error_type,
         "trace_id": result.trace.trace_id == trace_id,
+        "data": (
+            case.expected_data is None
+            or _matches_expected_data(result.data, case.expected_data)
+        ),
+        "content": not case.expected_content_terms or (
+            isinstance(content, str)
+            and all(term in content for term in case.expected_content_terms)
+        ),
+        "data_trace_id": (
+            not isinstance(result.data, Mapping)
+            or "trace_id" not in result.data
+            or result.data["trace_id"] == trace_id
+        ),
     }
     return EvaluationResult(
         case_id=case.case_id,
@@ -518,6 +565,8 @@ def evaluate_case(
         actual_tool=call.tool_name,
         actual_arguments=call.arguments,
         result=result,
+        tool_call_attempted=tool_call_attempted,
+        end_to_end_ms=round(end_to_end_ms, 3),
     )
 
 

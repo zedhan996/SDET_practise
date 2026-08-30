@@ -105,6 +105,21 @@ CLI 本身的测试位于 `test_qa_tool.py`，覆盖帮助信息、环境检查�
 98% statement coverage
 ```
 
+## Agent/RAG版本化行为评测
+
+固定15条任务，复用现有Planner、Registry和RAG门禁，统计任务通过率、工具调用成功率与端到端耗时：
+
+```powershell
+python -m pytest test_agent_evaluation.py -q -s
+python agent_evaluation.py
+```
+
+默认采用规则Planner与固定测试依赖，不需要启动Ollama，不访问开发库或持久化知识库。
+报告保存到 `reports/agent/`，人工复核项默认保持未完成。真实Planner模式和指标口径见
+[Agent与RAG版本化评测说明](docs/Agent与RAG版本化评测说明.md)。
+
+阶段证据：[2026-08-31两轮评测与人工复核记录](docs/Agent与RAG评测人工复核记录_20260831.md)。
+
 ## 项目结构
 
 ```text
@@ -119,6 +134,10 @@ CLI 本身的测试位于 `test_qa_tool.py`，覆盖帮助信息、环境检查�
 |-- test_agent_mvp.py Agent MVP 的契约、边界和 trace 测试
 |-- agent_rag.py      把受控 RAG 检索注册为 Agent 工具
 |-- agent_ollama.py   使用本机 Qwen 生成原生 Tool Calling 计划
+|-- agent_evaluation.py 版本化Agent行为评测、三项指标与报告
+|-- agent_evaluation_fixtures.py 隔离的固定数据与故障注入
+|-- test_agent_evaluation.py 评测case及Harness自身的测试
+|-- eval_cases/       版本化的Agent/RAG评测输入与预期结果
 |-- rag_mvp.py        文档切分、Embedding、Chroma 写入和检索
 |-- rag_query.py      Top-k、Reranker 和拒答门禁查询入口
 |-- rag_generation.py Ollama 受控答案生成及上游错误映射
@@ -134,6 +153,7 @@ CLI 本身的测试位于 `test_qa_tool.py`，覆盖帮助信息、环境检查�
 |-- dev.db            开发环境 SQLite 数据库（运行服务后生成）
 |-- test_isolated.db  测试环境 SQLite 数据库（运行 pytest 后生成）
 `-- reports/          所有测试工具生成的报告和调试产物
+    |-- agent/        Agent行为评测结果和待人工复核清单
     |-- ci/           CI 生成的 JUnit、覆盖率和 pytest 报告
     |-- coverage/     coverage.py 生成的 HTML 覆盖率报告
     |-- locust/       Locust 压测报告
