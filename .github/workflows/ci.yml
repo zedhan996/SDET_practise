@@ -60,6 +60,8 @@ jobs:
       RUN_OLLAMA_INTEGRATION: '0'
       RUN_RAG_INTEGRATION: '0'
       HF_HUB_OFFLINE: '1'
+      # 仅练习分支注入错误；验证红色后改为 '0'，再次推送验证绿色。
+      AGENT_GATE_DEMO: ${{ github.ref == 'refs/heads/ci-gate-demo' && '1' || '0' }}
 
     steps:
       - name: Check out repository
@@ -85,10 +87,30 @@ jobs:
             -m "not integration" -q \
             --junitxml=reports/ci-agent/junit.xml
 
+      - name: Prepare isolated evaluation cases
+        # 正式用例保持不变，只在报告目录生成本轮输入副本。
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          source = Path('eval_cases/agent_rag_v1.json')
+          payload = json.loads(source.read_text(encoding='utf-8'))
+          if os.environ.get('AGENT_GATE_DEMO') == '1':
+              case = next(c for c in payload['cases'] if c['case_id'] == 'catalog-get-001')
+              assert case['expected']['data']['data']['id'] == 101
+              case['expected']['data']['data']['id'] = 102
+              print('DEMO: catalog-get-001 expected id changed from 101 to 102')
+          destination = Path('reports/ci-agent/input-cases.json')
+          destination.parent.mkdir(parents=True, exist_ok=True)
+          destination.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding='utf-8')
+          PY
+
       - name: Require all versioned behavior cases to pass
         # 固定15条用例的任务通过率门槛为100%；不把工具成功率50%误判为失败。
         # 任意任务失败，现有CLI返回1，使本步骤和整个job失败。
-        run: python agent_evaluation.py --planner offline --output-dir reports/ci-agent/evaluation
+        run: python agent_evaluation.py --planner offline --cases reports/ci-agent/input-cases.json --output-dir reports/ci-agent/evaluation
 
       - name: Upload Agent reports even on failure
         if: always()
