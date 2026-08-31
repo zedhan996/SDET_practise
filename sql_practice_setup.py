@@ -1,13 +1,14 @@
-"""Create a small isolated SQLite database for SQL practice."""
+"""重建独立的SQL练习库；会清空练习表，不操作应用库或自动化测试库。"""
 
 from pathlib import Path
 import sqlite3
 
 
-DATABASE_PATH = Path(__file__).with_name("sql_practice.db")
+DATABASE_PATH = Path(__file__).resolve().parent / "data" / "practice" / "sql_practice.db"
 
 
 def main() -> None:
+    DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(DATABASE_PATH) as connection:
         connection.executescript(
             """

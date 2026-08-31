@@ -7,6 +7,7 @@ import jwt
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from sqlalchemy import create_engine, Column, Integer, String, Float
+from sqlalchemy.engine import URL, make_url
 from sqlalchemy.orm import sessionmaker, Session, declarative_base
 from fastapi.staticfiles import StaticFiles
 import logging
@@ -37,19 +38,52 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-# 根据运行环境隔离开发数据库与测试数据库。
+# 数据库目录固定在项目内，不随启动终端的当前目录改变。
+PROJECT_ROOT = Path(__file__).resolve().parent
+APP_DATABASE_PATH = PROJECT_ROOT / "data" / "app" / "dev.db"
+TEST_DATABASE_PATH = PROJECT_ROOT / "data" / "tests" / "test_isolated.db"
+
+
+def resolve_database_url(value: str) -> URL:
+    """统一普通SQLite文件路径，并兼容整理目录前的两个默认地址。"""
+    url = make_url(value)
+    # 内存库、SQLite URI及其他数据库的连接信息不按普通文件路径处理。
+    if (
+        url.get_backend_name() != "sqlite"
+        or not url.database
+        or url.database == ":memory:"
+        or url.database.startswith("file:")
+    ):
+        return url
+
+    database_path = Path(url.database)
+    if not database_path.is_absolute():
+        database_path = PROJECT_ROOT / database_path
+    database_path = database_path.resolve()
+    legacy_paths = {
+        PROJECT_ROOT / "dev.db": APP_DATABASE_PATH,
+        PROJECT_ROOT / "test_isolated.db": TEST_DATABASE_PATH,
+    }
+    # 旧启动命令仍指向迁移后的原库，避免在根目录重新生成空库。
+    database_path = legacy_paths.get(database_path, database_path)
+    database_path.parent.mkdir(parents=True, exist_ok=True)
+    return url.set(database=str(database_path))
+
+
+# 根据运行环境隔离开发数据库与测试数据库，仍允许环境变量覆盖。
 APP_ENV = os.getenv("APP_ENV", "development")
 if APP_ENV == "testing":
     DATABASE_URL = os.getenv(
         "TEST_DATABASE_URL",
-        "sqlite:///./test_isolated.db",
+        f"sqlite:///{TEST_DATABASE_PATH.as_posix()}",
     )
 else:
     DATABASE_URL = os.getenv(
         "APP_DATABASE_URL",
-        "sqlite:///./dev.db",
+        f"sqlite:///{APP_DATABASE_PATH.as_posix()}",
     )
 
+DATABASE_URL = resolve_database_url(DATABASE_URL)
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()

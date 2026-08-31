@@ -2,7 +2,34 @@ import pytest
 import requests
 import jwt
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from main import ItemModel, SECRET_KEY, ALGORITHM
+from main import APP_DATABASE_PATH, TEST_DATABASE_PATH, engine, resolve_database_url
+
+
+def test_database_uses_isolated_data_directory():
+    """确认pytest实际连接data/tests中的隔离库，不连接应用库。"""
+    assert Path(engine.url.database).resolve() == TEST_DATABASE_PATH
+    assert TEST_DATABASE_PATH != APP_DATABASE_PATH
+
+
+@pytest.mark.parametrize("legacy_name,expected_path", [
+    ("dev.db", APP_DATABASE_PATH),
+    ("test_isolated.db", TEST_DATABASE_PATH),
+])
+def test_legacy_database_urls_follow_new_layout(legacy_name, expected_path, tmp_path, monkeypatch):
+    """旧默认地址兼容新目录，且改变终端目录不会改变目标数据库。"""
+    monkeypatch.chdir(tmp_path)
+    url = resolve_database_url(f"sqlite:///./{legacy_name}")
+    assert Path(url.database) == expected_path
+
+
+def test_explicit_database_path_is_preserved(tmp_path):
+    """自定义绝对路径仍有效；解析配置只准备目录，不创建数据库文件。"""
+    custom_path = tmp_path / "custom" / "sample.db"
+    url = resolve_database_url(f"sqlite:///{custom_path.as_posix()}")
+    assert Path(url.database) == custom_path
+    assert not custom_path.exists()
 
 # 基础接口
 

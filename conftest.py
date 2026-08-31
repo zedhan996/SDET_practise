@@ -1,10 +1,15 @@
 import os
+from pathlib import Path
+
+
+PROJECT_ROOT = Path(__file__).resolve().parent
+TEST_DATABASE_PATH = PROJECT_ROOT / "data" / "tests" / "test_isolated.db"
 
 # 必须在导入 main 前设置测试环境，避免创建错误的数据库引擎。
 os.environ["APP_ENV"] = "testing"
 os.environ["APP_SECRET_KEY"] = "pytest-only-secret-key-at-least-32-chars"
 os.environ["APP_ADMIN_TOKEN"] = "pytest-only-admin-token"
-os.environ["TEST_DATABASE_URL"] = "sqlite:///./test_isolated.db"
+os.environ["TEST_DATABASE_URL"] = f"sqlite:///{TEST_DATABASE_PATH.as_posix()}"
 
 import pytest
 from fastapi.testclient import TestClient

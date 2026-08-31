@@ -25,12 +25,41 @@ python -m pip install -r requirements.txt
 $env:APP_ENV = "development"
 $env:APP_SECRET_KEY = "本地开发密钥，至少 32 个字符"
 $env:APP_ADMIN_TOKEN = "本地开发管理员令牌"
-$env:APP_DATABASE_URL = "sqlite:///./dev.db"
+$env:APP_DATABASE_URL = "sqlite:///./data/app/dev.db"
 ```
 
-运行 pytest 时，`conftest.py` 会在导入 `main.py` 前自动设置测试环境，并使用独立的 `test_isolated.db`。测试不会操作开发数据库。
+运行 pytest 时，`conftest.py` 会在导入 `main.py` 前自动设置测试环境，并使用独立的 `data/tests/test_isolated.db`。测试不会操作开发数据库。
 
 真实密钥、`.env` 文件和本地数据库不应提交到代码仓库。
+
+## 本地数据库目录
+
+2026-08-31将根目录的4个SQLite文件按用途迁移到 `data/`，保留原数据，不合并数据库：
+
+| 位置 | 用途 |
+| --- | --- |
+| `data/app/dev.db` | 本地应用默认使用的商品数据库 |
+| `data/tests/test_isolated.db` | pytest隔离库，测试前后重置商品数据 |
+| `data/practice/sql_practice.db` | SQL学习库，与应用和自动化测试隔离 |
+| `data/archive/test.db` | 当前源码未引用的旧库，保留待确认，不自动加载或删除 |
+| `data/chroma/` | 原有RAG向量库，目录保持不变 |
+
+应用的普通SQLite相对路径以项目根目录为基准，不受终端工作目录影响；需要的父目录会自动创建。
+环境变量仍可指定自定义数据库。旧配置 `sqlite:///./dev.db` 和 `sqlite:///./test_isolated.db`
+（以及对应的项目根目录绝对路径）会兼容到新位置，不会重新在根目录生成默认库。
+其他自定义绝对路径、内存库及SQLite URI不会套用这两个旧文件名的映射。
+这项兼容发生在Python应用内部；手工SQLite命令、数据库浏览器仍需选择新的文件位置。
+
+`sql_practice_setup.py` 现在写入 `data/practice/sql_practice.db`，但运行它仍会清空并重建练习表。
+迁移完成后不需要重新运行建库脚本。查看已有数据时优先用只读方式；索引实验另用临时副本。
+
+迁移后的验证命令（由学习者执行，不需要启动Ollama或Uvicorn）：
+
+```powershell
+python -m pytest test_api.py test_observability.py test_qa_tool.py -q -s
+```
+
+数据库文件与SQLite配套日志都由 `.gitignore` 忽略，Git只提交程序、测试和说明。
 
 ## 两种登录链路
 
@@ -150,8 +179,12 @@ python agent_evaluation.py
 |   |-- index.html     业务前端页面结构
 |   |-- styles.css     页面样式和响应式布局
 |   `-- app.js         登录、请求、渲染和页面交互逻辑
-|-- dev.db            开发环境 SQLite 数据库（运行服务后生成）
-|-- test_isolated.db  测试环境 SQLite 数据库（运行 pytest 后生成）
+|-- data/             按用途隔离的本地数据库，不提交到Git
+|   |-- app/dev.db    本地应用库
+|   |-- tests/test_isolated.db  自动化测试库
+|   |-- practice/sql_practice.db  SQL练习库
+|   |-- archive/test.db  用途待确认的旧库
+|   `-- chroma/       RAG向量库，保持原位
 `-- reports/          所有测试工具生成的报告和调试产物
     |-- agent/        Agent行为评测结果和待人工复核清单
     |-- ci/           CI 生成的 JUnit、覆盖率和 pytest 报告

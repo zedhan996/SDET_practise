@@ -13,10 +13,24 @@ test-results/
 # Generated local Chroma vector index (rebuild from knowledge/)
 data/chroma/
 
+# 本地数据库按用途分类；数据库与配套日志均不提交
+data/app/
+data/tests/
+data/practice/
+data/archive/
+
 *.db
 *.db-journal
+*.db-wal
+*.db-shm
 *.sqlite
 *.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite-journal
+*.sqlite3-wal
+*.sqlite3-shm
+*.sqlite3-journal
 
 # Local virtual environments and logs
 .venv/
