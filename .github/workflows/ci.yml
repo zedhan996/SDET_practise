@@ -60,8 +60,8 @@ jobs:
       RUN_OLLAMA_INTEGRATION: '0'
       RUN_RAG_INTEGRATION: '0'
       HF_HUB_OFFLINE: '1'
-      # 仅练习分支注入错误；验证红色后改为 '0'，再次推送验证绿色。
-      AGENT_GATE_DEMO: ${{ github.ref == 'refs/heads/ci-gate-demo' && '1' || '0' }}
+      # 云端红色门禁已验证；关闭故障注入，使用正常预期验证恢复绿色。
+      AGENT_GATE_DEMO: '0'
 
     steps:
       - name: Check out repository
