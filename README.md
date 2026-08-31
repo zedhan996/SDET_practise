@@ -61,6 +61,51 @@ python -m pytest test_api.py test_observability.py test_qa_tool.py -q -s
 
 数据库文件与SQLite配套日志都由 `.gitignore` 忽略，Git只提交程序、测试和说明。
 
+### 名称索引计时实验
+
+[索引计时脚本](sql_practice/index_timing.sql) 只操作已有副本 `data/practice/index_lab.db`，
+不修改原练习库、应用库或接口代码。请从项目根目录执行：
+
+```powershell
+& "E:\ana\Library\bin\sqlite3.exe" -bail ":memory:" ".read sql_practice/index_timing.sql"
+```
+
+脚本打开实验副本后，增加十万条带 `INDEX-LAB-` 标记的数据，固定编号避免重复插入；
+已有编号若内容不符合实验预期，则停止并回滚本次准备事务，不覆盖原记录。
+实验数据会保留在副本中，不会在运行结束时自动清除，也不会提交到Git。
+脚本要求副本已存在且有 `items` 表；不要为此重新运行会清表的建库脚本。
+
+- A组：精确名称查询加 `NOT INDEXED`，禁用普通索引；本查询预期为表扫描。
+- B组：同样的精确名称查询，不限制查询计划；预期选择 `idx_items_name`。
+- 准备数据和建索引不计时；先检查计划并各预热一次，再交替测量五轮。
+- 每条查询预期返回 `1100000|INDEX-LAB-100000|19.99`；先确认结果一致，再看耗时。
+- `.timer` 的 `real` 单位是秒，显示零可能只是低于显示精度，不能算作真正零耗时。
+
+这是同一副本上两种访问路径的暖缓存演示，不是生产压测，也没有证明包含搜索
+`LIKE '%Keyboard%'` 获得提速，更不能直接作为HTTP接口的性能指标。
+
+### 事务与回滚入门实验
+
+[事务入门脚本](sql_practice/transaction_basics.sql) 继续使用同一个 `index_lab.db` 副本。
+它在同一事务内临时插入两条带 `transaction-lab` 标记的数据，先在事务中查询到它们，
+再执行 `ROLLBACK`，最后确认记录数重新为 `0`。因此脚本不会留下演示数据。
+
+```powershell
+& "E:\ana\Library\bin\sqlite3.exe" -bail ":memory:" ".read sql_practice/transaction_basics.sql"
+```
+
+这个小实验只说明显式回滚的基本行为；下一步才会模拟“第二个业务步骤失败”时应用应当回滚的场景。
+
+随后可运行 [事务失败演示](sql_practice/transaction_failure_demo.py)：先在事务中创建订单，
+再故意为不存在的商品创建订单明细。开启外键检查后第二步会触发 `IntegrityError`，
+程序捕获异常并回滚，因此订单本身也不会留在数据库中。
+
+```powershell
+python sql_practice/transaction_failure_demo.py
+```
+
+预期最后显示 `事务后订单数： 0`。这才是服务端多步骤写入遇到错误时的基本保护方式。
+
 ## 两种登录链路
 
 项目保留两套有明确用途的认证方式：
