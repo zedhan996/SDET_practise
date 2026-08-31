@@ -22,6 +22,7 @@ from agent_evaluation_fixtures import (
     build_evaluation_environment,
 )
 from agent_mvp import EvaluationCase, evaluate_case
+from agent_ollama import get_planner_prompt
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -228,10 +229,15 @@ def summarize_results(rows: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def run_suite(suite: EvaluationSuite, planner_mode: str = "offline") -> dict[str, Any]:
+def run_suite(
+    suite: EvaluationSuite, planner_mode: str = "offline", prompt_version: str = "v0",
+) -> dict[str, Any]:
     """按case隔离执行，保存实际输出，且为每轮生成互不重复的trace。"""
     if planner_mode not in {"offline", "ollama"}:
         raise ValueError("planner只能是offline或ollama")
+    prompt_text = get_planner_prompt(prompt_version)
+    if planner_mode == "offline" and prompt_version != "v0":
+        raise ValueError("离线规则不使用模型提示词；v1评测请使用--planner ollama")
     if planner_mode == "ollama" and os.getenv("RUN_OLLAMA_INTEGRATION") != "1":
         raise ValueError("真实Planner须显式设置RUN_OLLAMA_INTEGRATION=1")
     run_id = uuid.uuid4().hex
@@ -245,7 +251,7 @@ def run_suite(suite: EvaluationSuite, planner_mode: str = "offline") -> dict[str
         environment = None
         planner_model = None
         try:
-            environment = build_evaluation_environment(entry.fixture, planner_mode)
+            environment = build_evaluation_environment(entry.fixture, planner_mode, prompt_version)
             planner_kind = environment.planner_kind
             planner_model = getattr(environment.agent.planner, "model", None)
             actual = asdict(evaluate_case(case, environment.agent, trace_id=trace_id))
@@ -276,6 +282,11 @@ def run_suite(suite: EvaluationSuite, planner_mode: str = "offline") -> dict[str
             "fixture": entry.fixture,
             "planner_kind": planner_kind,
             "planner_model": planner_model,
+            # 注入输出和离线规则没有用到提示词，不能标成模型A/B证据。
+            "prompt_version": (
+                getattr(environment.agent.planner, "prompt_version", None)
+                if environment and planner_kind == "ollama" else None
+            ),
             "trace_id": trace_id,
             "input": {"user_text": case.user_text, "permissions": sorted(case.permissions)},
             "expected": {
@@ -302,6 +313,11 @@ def run_suite(suite: EvaluationSuite, planner_mode: str = "offline") -> dict[str
             "source_path": suite.source_path, "source_sha256": suite.source_sha256,
         },
         "requested_planner": planner_mode,
+        "prompt": {
+            "version": prompt_version,
+            "text": prompt_text,
+            "sha256": hashlib.sha256(prompt_text.encode("utf-8")).hexdigest(),
+        } if planner_mode == "ollama" else None,
         "scope_notes": list(SCOPE_NOTES),
         "summary": summarize_results(rows),
         "by_planner": {
@@ -337,6 +353,7 @@ def render_markdown(report: dict[str, Any]) -> str:
         f"依赖版本：{report['suite']['fixture_version']}", "",
         f"运行ID：{report['run_id']}；生成时间（UTC）：{report['created_at_utc']}", "",
         f"用例文件SHA256：{report['suite']['source_sha256']}", "",
+        f"提示词版本：{report['prompt']['version'] if report.get('prompt') else '不适用（离线规则）'}", "",
         "## 测试范围", "",
         *[f"- {note}" for note in report["scope_notes"]], "",
         "## 汇总", "",
@@ -411,14 +428,16 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="运行Agent/RAG版本化行为评测")
     parser.add_argument("--cases", type=Path, default=DEFAULT_CASES_PATH)
     parser.add_argument("--planner", choices=("offline", "ollama"), default="offline")
+    parser.add_argument("--prompt-version", choices=("v0", "v1"), default="v0")
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_REPORT_DIRECTORY)
     args = parser.parse_args(argv)
     try:
-        report = run_suite(load_suite(args.cases), args.planner)
+        report = run_suite(load_suite(args.cases), args.planner, args.prompt_version)
         json_path, markdown_path = write_reports(report, args.output_dir)
     except (OSError, ValueError) as exc:
         print(f"评测未完成：{exc}", file=sys.stderr)
         return 2
+    print(f"提示词版本：{report['prompt']['version'] if report['prompt'] else '不适用（离线规则）'}")
     for row in report["results"]:
         print(
             f"{'PASS' if row['actual']['passed'] else 'FAIL'} | {row['case_id']} | "

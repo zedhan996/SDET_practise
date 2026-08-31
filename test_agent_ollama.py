@@ -1,10 +1,11 @@
 import json
 import socket
+import pytest
 from typing import Any
 from urllib import error as url_error
 
 from agent_mvp import ToolCallingAgent, ToolRegistry, ToolSpec
-from agent_ollama import OllamaToolPlanner
+from agent_ollama import OllamaToolPlanner, OLLAMA_PLANNER_SYSTEM_PROMPT, get_planner_prompt
 
 
 CATALOG_READ = frozenset({"catalog:read"})
@@ -278,3 +279,32 @@ def test_agent_maps_ollama_unavailable_to_planner_error():
 
     assert result.ok is False
     assert result.error_type == "PLANNER_UNAVAILABLE"
+
+
+@pytest.mark.parametrize("version", ["v0", "v1"])
+def test_selected_prompt_is_sent_without_changing_other_request_fields(version):
+    """截获请求验证版本真正进入system消息，而工具契约和用户输入不变。"""
+    captured = {}
+
+    def transport(request, _timeout):
+        captured["payload"] = json.loads(request.data)
+        return make_tool_response("get_item", {"item_id": 101})
+
+    planner = OllamaToolPlanner.from_registry(
+        build_test_registry(), prompt_version=version, transport=transport,
+    )
+    planner.plan("查询商品101", CATALOG_READ)
+    payload = captured["payload"]
+    assert payload["messages"][0]["content"] == get_planner_prompt(version)
+    assert payload["messages"][1]["content"] == "查询商品101"
+    assert payload["model"] == "qwen3:4b-instruct"
+    assert payload["options"] == {"temperature": 0.0, "num_predict": 256}
+    assert len(payload["tools"]) == 3
+    assert get_planner_prompt("v0") == OLLAMA_PLANNER_SYSTEM_PROMPT
+    assert get_planner_prompt("v1") != get_planner_prompt("v0")
+
+
+def test_unknown_prompt_version_is_rejected():
+    """版本拼错时应在发送请求前失败，不悄悄使用默认提示词。"""
+    with pytest.raises(ValueError, match="prompt_version"):
+        OllamaToolPlanner.from_registry(build_test_registry(), prompt_version="typo")

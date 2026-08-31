@@ -112,7 +112,9 @@ class EvaluationEnvironment:
     planner_kind: str
 
 
-def build_evaluation_environment(profile: str, planner_mode: str = "offline") -> EvaluationEnvironment:
+def build_evaluation_environment(
+    profile: str, planner_mode: str = "offline", prompt_version: str = "v0",
+) -> EvaluationEnvironment:
     """只接收依赖配置，不接收case的expected字段，避免按答案构造执行结果。"""
     if profile not in FIXTURE_PROFILES:
         raise ValueError(f"unknown fixture profile: {profile}")
@@ -169,7 +171,7 @@ def build_evaluation_environment(profile: str, planner_mode: str = "offline") ->
     elif planner_mode == "ollama":
         from agent_ollama import OllamaToolPlanner
 
-        planner = OllamaToolPlanner.from_registry(registry)
+        planner = OllamaToolPlanner.from_registry(registry, prompt_version=prompt_version)
         planner_kind = "ollama"
     else:
         planner = OfflineCatalogKnowledgePlanner()

@@ -50,3 +50,50 @@ jobs:
           name: python-test-reports
           path: reports/ci/
           if-no-files-found: ignore
+
+  agent-offline:
+    name: Agent offline regression gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # 本任务不允许真实模型集成运行，也不下载模型权重。
+      RUN_OLLAMA_INTEGRATION: '0'
+      RUN_RAG_INTEGRATION: '0'
+      HF_HUB_OFFLINE: '1'
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            .github/workflows/ci.yml
+
+      - name: Install offline evaluation dependencies
+        # 固定替身仍会导入Chroma类型，但不需要Sentence Transformers或Ollama。
+        run: python -m pip install -r requirements.txt chromadb==1.5.9
+
+      - name: Run Agent unit regression
+        run: |
+          mkdir -p reports/ci-agent
+          python -m pytest test_agent_mvp.py test_agent_rag.py test_agent_ollama.py test_agent_evaluation.py \
+            -m "not integration" -q \
+            --junitxml=reports/ci-agent/junit.xml
+
+      - name: Require all versioned behavior cases to pass
+        # 固定15条用例的任务通过率门槛为100%；不把工具成功率50%误判为失败。
+        # 任意任务失败，现有CLI返回1，使本步骤和整个job失败。
+        run: python agent_evaluation.py --planner offline --output-dir reports/ci-agent/evaluation
+
+      - name: Upload Agent reports even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-offline-reports
+          path: reports/ci-agent/
+          if-no-files-found: ignore

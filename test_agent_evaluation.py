@@ -248,7 +248,7 @@ def test_planner_groups_remain_separate_in_opt_in_mode(suite, monkeypatch):
     """模拟真实模式的分组但仍使用离线代理，确保3条注入case不算模型成功率。"""
     monkeypatch.setenv("RUN_OLLAMA_INTEGRATION", "1")
 
-    def offline_factory(profile, mode):
+    def offline_factory(profile, mode, prompt_version):
         assert mode == "ollama"
         environment = build_evaluation_environment(profile, planner_mode="offline")
         if environment.planner_kind == "offline_rules":
@@ -265,10 +265,10 @@ def test_harness_exception_is_visible_and_does_not_stop_other_cases(suite, monke
     """评测器异常必须显示为失败；后续case继续运行，未知调用数不能凭空算成功。"""
     original_factory = build_evaluation_environment
 
-    def broken_factory(profile, mode):
+    def broken_factory(profile, mode, prompt_version):
         if profile == "catalog":
             raise RuntimeError("评测依赖配置损坏")
-        return original_factory(profile, mode)
+        return original_factory(profile, mode, prompt_version)
 
     monkeypatch.setattr(agent_evaluation, "build_evaluation_environment", broken_factory)
     report = run_suite(replace(suite, cases=(suite.cases[0], suite.cases[3])))
@@ -326,3 +326,74 @@ def test_cli_configuration_error_returns_two(tmp_path, capsys):
     """找不到用例文件是配置错误，不能误报为测试通过或普通业务拒绝。"""
     assert main(["--cases", str(tmp_path / "missing.json")]) == 2
     assert "评测未完成" in capsys.readouterr().err
+
+
+def test_full_suite_regression_blocks_gate_and_keeps_report(tmp_path, capsys):
+    """只改临时副本的一条预期，确认14/15任务通过会返回1并留下失败证据。"""
+    payload = json.loads(DEFAULT_CASES_PATH.read_text(encoding="utf-8"))
+    # 固定工具实际返回101；这里故意期望102，不修改正式用例或业务代码。
+    payload["cases"][0]["expected"]["data"] = {"data": {"id": 102}}
+    cases_path = tmp_path / "regression-cases.json"
+    cases_path.write_text(json.dumps(payload), encoding="utf-8")
+    output_dir = tmp_path / "reports"
+    exit_code = main([
+        "--planner", "offline", "--cases", str(cases_path),
+        "--output-dir", str(output_dir),
+    ])
+    assert exit_code == 1
+    assert "14/15" in capsys.readouterr().out
+    paths = list(output_dir.glob("*/results.json"))
+    assert len(paths) == 1
+    report = json.loads(paths[0].read_text(encoding="utf-8"))
+    assert report["summary"]["failed"] == 1
+    assert report["summary"]["task_pass_rate"] < 1.0
+    assert "data" in report["results"][0]["failed_checks"]
+
+
+def test_offline_report_does_not_claim_prompt_evaluation(offline_report, suite):
+    """离线规则没有使用提示词，报告必须标明不适用，且不允许假装运行v1。"""
+    assert offline_report["prompt"] is None
+    assert all(row["prompt_version"] is None for row in offline_report["results"])
+    with pytest.raises(ValueError, match="离线规则"):
+        run_suite(suite, prompt_version="v1")
+
+
+@pytest.mark.parametrize("version", ["v0", "v1"])
+def test_prompt_version_reaches_planner_and_report(suite, monkeypatch, tmp_path, version):
+    """用假HTTP响应串起版本传递与报告落盘，注入用例仍不标记提示词版本。"""
+    import hashlib
+    from agent_ollama import OllamaToolPlanner, get_planner_prompt
+
+    monkeypatch.setenv("RUN_OLLAMA_INTEGRATION", "1")
+    captured = []
+    original_factory = build_evaluation_environment
+
+    def transport(request, _timeout):
+        captured.append(json.loads(request.data)["messages"][0]["content"])
+        return json.dumps({"message": {"tool_calls": [{"function": {
+            "name": "get_item", "arguments": {"item_id": 101},
+        }}]}}).encode("utf-8")
+
+    def fake_factory(profile, mode, prompt_version):
+        environment = original_factory(profile, mode, prompt_version)
+        if environment.planner_kind == "ollama":
+            environment.agent.planner = replace(environment.agent.planner, transport=transport)
+            assert isinstance(environment.agent.planner, OllamaToolPlanner)
+        return environment
+
+    monkeypatch.setattr(agent_evaluation, "build_evaluation_environment", fake_factory)
+    selected = tuple(entry for entry in suite.cases if entry.case.case_id in {
+        "catalog-get-001", "injection-unknown-tool-001",
+    })
+    report = run_suite(replace(suite, cases=selected), "ollama", version)
+    text = get_planner_prompt(version)
+    assert captured == [text]
+    assert report["summary"]["passed"] == 2
+    assert report["prompt"] == {
+        "version": version, "text": text,
+        "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+    }
+    assert [row["prompt_version"] for row in report["results"]] == [version, None]
+    json_path, markdown_path = write_reports(report, tmp_path)
+    assert json.loads(json_path.read_text(encoding="utf-8"))["prompt"] == report["prompt"]
+    assert f"提示词版本：{version}" in markdown_path.read_text(encoding="utf-8")

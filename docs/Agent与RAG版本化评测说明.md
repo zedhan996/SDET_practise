@@ -121,3 +121,36 @@ JSON中的 `pending` 是生成报告当时的快照，后续人工结论以填�
 两轮各5条人工复核项已依据用户反馈及原始输出补录；JSON原始快照不修改。
 可提交的精选证据见上述复核记录，完整报告留在被忽略的 `reports/agent/`。
 这只表示当前固定依赖行为评测阶段完成，不代表真实RAG质量、MCP或CI指标门禁已经验收。
+
+## 提示词版本对比：v0与v1
+
+现在可用 `--prompt-version v0` 或 `--prompt-version v1` 选择Planner提示词。
+v0保留原始说明；v1补充工具分工和查询改写约束，是待验证的候选方案，不保证优于v0。
+不指定版本时仍使用v0；离线规则不读取提示词，因此拒绝离线v1运行。
+
+先运行单元回归（不需要Ollama）：
+
+```powershell
+python -m pytest test_agent_mvp.py test_agent_rag.py test_agent_ollama.py test_agent_evaluation.py -q -s
+```
+
+启动Ollama后，保持模型、用例、工具契约和依赖行为一致，分别运行：
+
+```powershell
+$env:RUN_OLLAMA_INTEGRATION = "1"
+python agent_evaluation.py --planner ollama --prompt-version v0
+python agent_evaluation.py --planner ollama --prompt-version v1
+Remove-Item Env:RUN_OLLAMA_INTEGRATION
+```
+
+每轮仍生成独立目录，不覆盖旧报告。JSON的 `prompt` 保存版本、原文和SHA256指纹；
+逐条结果中的 `prompt_version` 对真实Planner有值，对3条注入输出为null。
+Markdown报告展示版本和分组指标。对比 `ollama` 组的任务通过率、工具成功率和耗时，
+不要把注入输出的成功当作提示词收益；知识query改写仍需人工复核。
+
+本轮新增6条参数化展开后的单元测试，覆盖两版请求内容、非法版本、离线不适用标记，
+以及两版从配置到报告的传递。使用假HTTP响应，不证明真实Qwen理解质量。
+尚未新增自动A/B差异报告或CI门禁，真实运行结果待用户执行。
+
+首次调用可能包含模型冷启动；单次先v0后v1的耗时不能直接证明v1更快。
+性能比较应先预热，再交换顺序重复运行；小样本全部通过只能说明未观察到退化。

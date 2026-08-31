@@ -25,6 +25,23 @@ OLLAMA_PLANNER_SYSTEM_PROMPT = """你是SDET商品系统的工具规划器。
 不要直接回答用户问题，不要编造工具，不要输出权限或trace_id。
 权限、工具校验和实际执行均由应用程序负责。"""
 
+# v0保留原文；v1只是待评测的候选方案，不预先断言它一定更好。
+OLLAMA_PLANNER_PROMPTS = {
+    "v0": OLLAMA_PLANNER_SYSTEM_PROMPT,
+    "v1": OLLAMA_PLANNER_SYSTEM_PROMPT + """
+工具分工：明确商品ID的详情查询使用get_item；按名称关键词或最高价格查商品使用search_items；
+询问接口规则、鉴权、状态码、日志或商品创建规则使用search_knowledge。
+保留用户给出的ID、名称关键词和价格上限，不添加用户没有提供的筛选条件。
+知识查询可以改写，但必须保留问题原意、否定条件和限定范围，不能改成预设答案。""",
+}
+
+
+def get_planner_prompt(version: str) -> str:
+    """只允许选择已登记的提示词版本，避免拼写错误后悄悄回退。"""
+    if version not in OLLAMA_PLANNER_PROMPTS:
+        raise ValueError("prompt_version必须是v0或v1")
+    return OLLAMA_PLANNER_PROMPTS[version]
+
 
 def _send_ollama_planner_request(
     http_request: url_request.Request,
@@ -87,9 +104,11 @@ class OllamaToolPlanner:
         repr=False,
         compare=False,
     )
+    prompt_version: str = "v0"
 
     def __post_init__(self) -> None:
         """启动前校验连接配置和工具契约，尽早暴露配置错误。"""
+        get_planner_prompt(self.prompt_version)
         parsed_url = urlparse(self.base_url)
         if parsed_url.scheme not in {"http", "https"} or not parsed_url.netloc:
             raise ValueError("base_url must be a valid HTTP or HTTPS URL")
@@ -130,7 +149,7 @@ class OllamaToolPlanner:
         payload = {
             "model": self.model,
             "messages": [
-                {"role": "system", "content": OLLAMA_PLANNER_SYSTEM_PROMPT},
+                {"role": "system", "content": get_planner_prompt(self.prompt_version)},
                 {"role": "user", "content": user_text.strip()},
             ],
             "tools": build_ollama_tool_definitions(self.tool_contracts),

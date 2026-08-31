@@ -193,3 +193,34 @@ origin/main  GitHub 上的远程分支
 因此目前可以准确表述为：
 
 > 已将接口、可观测性和 CLI 自动化测试接入 GitHub Actions。代码每次 push 或 Pull Request 时，会在干净环境中自动安装依赖、执行基础 pytest、生成测试与覆盖率报告，并以测试结果作为质量门禁。当前 CI 已实际运行通过；浏览器、真实 HTTP 和性能测试仍未纳入这条基础流水线。
+
+## Agent离线门禁（新增，待执行验证）
+
+保留原有API测试job，另增 `Agent offline regression gate`：
+
+1. 安装基础依赖和Chroma 1.5.9，不安装Sentence Transformers、不下载模型权重。
+2. 执行Agent、Agent/RAG、Ollama请求包装和评测器的单元测试，HTTP使用替身。
+3. 执行 `python agent_evaluation.py --planner offline`，运行固定15条版本化行为用例。
+4. 任意任务断言失败则退出1，配置错误退出2，均会令CI失败；全部通过退出0。
+5. 无论成功或失败都尝试上传已生成的 `agent-offline-reports` 制品。
+
+本轮的指标门槛是任务通过率100%。工具调用成功率7/14并不代表任务失败，
+因为权限拒绝、错误参数等负向用例的预期本来就是拒绝。真实模型耗时不设硬门禁。
+该job验证确定性程序行为，不证明Qwen提示词质量或真实知识库检索质量。
+
+本地先执行（不需要启动Ollama）：
+
+```powershell
+python -m pytest test_agent_mvp.py test_agent_rag.py test_agent_ollama.py test_agent_evaluation.py -m "not integration" -q -s
+python agent_evaluation.py --planner offline --output-dir reports/ci-agent/evaluation
+$LASTEXITCODE
+```
+
+新增 `test_full_suite_regression_blocks_gate_and_keeps_report`：在临时用例副本中故意把
+商品101的预期改成102，确认任务通过率降为14/15、CLI返回1且失败报告保留。
+此测试自身通过，表示它成功验证了失败门禁；不是故意把整个pytest套件跑红。
+正式用例不改，临时文件由pytest测试目录管理。
+
+当前只完成配置与测试代码，不能宣称GitHub新增job已经运行成功。
+推送后还需查看Actions；受控的云端红色门禁演示另行安排，不在本轮自动提交失败代码。
+CI失败也不自动等于禁止合并，若需要强制阻止合并，还要配置分支保护的必需检查。
