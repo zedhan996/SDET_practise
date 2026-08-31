@@ -1,0 +1,4 @@
+# MCP 为可选学习依赖；这里使用官方 SDK 的 2.x 接口。
+-r requirements.txt
+# 学习者已安装并完成 stdio 冒烟的版本，固定以便复现。
+mcp==2.1.1
