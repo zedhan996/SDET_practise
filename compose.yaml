@@ -1,0 +1,44 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    image: sdet-fastapi:local
+    ports:
+      - "8001:8000"
+    environment:
+      APP_ENV: development
+      APP_SECRET_KEY: ${APP_SECRET_KEY:?请在.env中设置至少32字符的APP_SECRET_KEY}
+      APP_ADMIN_TOKEN: ${APP_ADMIN_TOKEN:-}
+      APP_DATABASE_URL: sqlite:////app/data/app/dev.db
+    volumes:
+      # 命名卷保留SQLite数据；其物理文件位于已迁移到E盘的Docker数据盘。
+      - app-data:/app/data/app
+    healthcheck:
+      # 使用Python标准库探测，不为健康检查额外安装curl。
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: "no"
+    init: true
+
+  api-tests:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: test
+    image: sdet-fastapi-test:local
+    profiles: ["test"]
+    environment:
+      # 测试配置只在测试容器内使用，不读取本机真实Secret。
+      APP_ENV: testing
+      APP_SECRET_KEY: pytest-only-secret-key-at-least-32-chars
+      APP_ADMIN_TOKEN: pytest-only-admin-token
+      TEST_DATABASE_URL: sqlite:////app/data/tests/test_isolated.db
+    init: true
+
+volumes:
+  app-data:

@@ -131,6 +131,73 @@ python -m uvicorn main:app --reload --log-config logging.ini
 
 现有 pytest 用例通过 FastAPI `TestClient` 直接调用应用，因此运行这些测试前不需要启动 Uvicorn。真实 HTTP smoke、手工接口验证和网络测试才需要启动服务。
 
+## Docker Compose启动（学习环境）
+
+当前最小容器只运行FastAPI、Uvicorn和SQLite，不包含浏览器测试、压测工具、RAG模型或Ollama。
+Docker Desktop使用Linux容器，宿主机端口8001映射到容器端口8000。
+
+首次运行前复制变量模板：
+
+```powershell
+Copy-Item .env.example .env
+```
+
+打开 `.env`，把占位值替换为仅用于本机的随机值。`.env` 已被Git忽略；
+Dockerfile和compose.yaml不保存真实密钥。然后先运行本地契约测试和配置检查：
+
+```powershell
+python -m pytest test_api.py -q -s
+docker compose config
+```
+
+构建并后台启动：
+
+```powershell
+docker compose up --build -d
+docker compose ps
+docker compose logs api
+```
+
+`docker compose ps` 中api应最终显示healthy。访问：
+
+```text
+http://127.0.0.1:8001/health
+http://127.0.0.1:8001/
+http://127.0.0.1:8001/docs
+http://127.0.0.1:8001/app/
+```
+
+停止并删除容器和Compose网络，但保留SQLite命名卷：
+
+```powershell
+docker compose down
+```
+
+容器内执行 API 测试（临时测试容器结束后自动删除）：
+
+```powershell
+docker compose --profile test run --build --rm api-tests
+```
+
+`api-tests` 使用 Dockerfile 的独立测试阶段，额外安装 pytest、httpx 和 pytest-mock；正式 `api` 镜像不包含这些测试依赖和测试代码。
+
+只有明确需要清空容器数据库时才使用 `docker compose down --volumes`；这会删除本项目命名卷，
+属于数据删除操作，不作为普通停止命令。宿主机原有 `data/app/dev.db` 不会复制进镜像，
+也不会被容器修改；容器使用独立的 `app-data` 卷。
+
+文件职责：
+
+| 文件 | 作用 |
+| --- | --- |
+| `Dockerfile` | 定义运行镜像、依赖、普通用户和启动命令 |
+| `compose.yaml` | 定义服务、端口、环境变量、数据卷和健康检查 |
+| `.dockerignore` | 排除Git、报告、数据库、测试与模型代码，缩小构建上下文 |
+| `requirements-runtime.txt` | 仅包含Web服务运行依赖 |
+| `.env.example` | 可提交的变量名与占位模板，不含可用Secret |
+
+`GET /health` 只表示应用进程可以处理HTTP请求，不检查第三方支付、真实模型或完整数据库业务，
+因此它是当前最小存活/就绪探针，不是全系统健康证明。
+
 ## 运行测试并生成报告
 
 ```powershell

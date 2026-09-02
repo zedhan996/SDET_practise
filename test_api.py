@@ -39,6 +39,15 @@ def test_root_endpoint(client):
     assert response.status_code == 200
     assert response.json() == {"message": "Hello, SDET!"}
 
+
+def test_health_endpoint(client):
+    """健康检查应稳定返回最小状态，不包含密钥、数据库地址等内部配置。"""
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok", "service": "sdet-fastapi"}
+    assert "secret" not in response.text.lower()
+    assert "database" not in response.text.lower()
+
 # 登录与会话
 
 def test_login_success(client):

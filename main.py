@@ -226,6 +226,12 @@ def call_third_party_payment(order_id: str, amount: float):
 def read_root():
     return {"message": "Hello, SDET!"}
 
+
+@app.get("/health", include_in_schema=False)
+def read_health():
+    """供容器和部署平台探测应用进程，不暴露配置或业务数据。"""
+    return {"status": "ok", "service": "sdet-fastapi"}
+
 @app.post("/login")
 def login(request: LoginRequest):
     """校验用户凭证并签发 JWT。"""

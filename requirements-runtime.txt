@@ -1,0 +1,7 @@
+# 服务镜像只安装运行依赖；pytest、Playwright和Locust仍由测试环境管理。
+fastapi==0.139.2
+pydantic==2.13.4
+SQLAlchemy==2.0.51
+requests==2.34.2
+PyJWT==2.13.0
+uvicorn==0.51.0

@@ -1,0 +1,4 @@
+# 容器内API测试只安装必要插件，不引入Playwright、Locust和AI依赖。
+httpx==0.28.1
+pytest==9.1.1
+pytest-mock==3.15.1
