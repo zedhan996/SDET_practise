@@ -35,6 +35,7 @@ jobs:
             test_api.py \
             test_observability.py \
             test_qa_tool.py \
+            test_smoke_http.py \
             --cov=main \
             --cov-report=term-missing \
             --cov-report=xml:reports/ci/coverage.xml \
@@ -171,11 +172,9 @@ jobs:
           echo "health endpoint did not become ready within 60 seconds"
           exit 1
 
-      - name: Verify deployed HTTP responses
-        shell: bash
-        run: |
-          test "$(curl --fail --silent http://127.0.0.1:8001/health)" = '{"status":"ok","service":"sdet-fastapi"}'
-          test "$(curl --fail --silent http://127.0.0.1:8001/)" = '{"message":"Hello, SDET!"}'
+      - name: Run deployment Smoke gate
+        # 测试容器通过Compose内部网络，以服务名api访问已启动的正式容器。
+        run: docker compose --profile test run --rm api-tests python smoke_http.py --base-url http://api:8000 --health-attempts 10 --health-interval 1
 
       - name: Log in to GitHub Container Registry
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
