@@ -73,6 +73,31 @@ Pull Request 和手动运行只执行构建与验收，不推送镜像，避免�
 docker pull ghcr.io/zedhan996/sdet-practise-api:latest
 ```
 
+## 首次发布验收证据
+
+2026-09-03，`main` 分支提交
+`9a8da8fe1b0499390a09a476b000b3bddd4e994f` 已通过三项门禁并发布到 GHCR：
+
+```text
+Package：sdet-practise-api
+不可变版本标签：sha-9a8da8fe1b0499390a09a476b000b3bddd4e994f
+镜像摘要：sha256:b1ed8a78c5c0307818fcc0c9b6322cefa36bb799601ab9bdad188916dde550f8
+关联仓库：zedhan996/SDET_practise
+```
+
+标签回答“这份镜像来自哪次 Git 提交”，摘要回答“镜像内容究竟是哪一份”。即使标签将来被错误移动，摘要仍可用于精确识别镜像内容。
+
+首次成功发布时，GitHub 提示部分 Action 仍以 Node.js 20 为运行时。该提示不代表本次发布失败，但属于需要消除的兼容性预警。工作流随后升级为 Node.js 24 对应的大版本：
+
+```text
+actions/checkout@v4           → actions/checkout@v6
+actions/setup-python@v5       → actions/setup-python@v6
+docker/setup-buildx-action@v3 → docker/setup-buildx-action@v4
+docker/login-action@v3        → docker/login-action@v4
+```
+
+升级后必须再次观察三个 Job 是否全部通过，并检查 Actions 页的 Node.js 20 警告是否消失；不能只因为修改了版本号就认定维护完成。
+
 ## Secret 边界
 
 流水线中的 `APP_SECRET_KEY` 和 `APP_ADMIN_TOKEN` 是一次性 CI 测试值，不是生产密钥。它们只在容器启动时通过环境变量注入，不参与 Dockerfile 构建，也不会被写入镜像。
