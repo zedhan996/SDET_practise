@@ -5,9 +5,9 @@
 CI（Continuous Integration，持续集成）用于在代码 push 或 Pull Request 时自动执行一组稳定测试。当前第一阶段只运行不依赖外部服务和浏览器的 pytest：
 
 ```text
-test_api.py
-test_observability.py
-test_qa_tool.py
+tests/api/test_api.py
+tests/api/test_observability.py
+tests/tools/test_qa_tool.py
 ```
 
 这组测试覆盖接口回归、request id、数据库断言、鉴权、异常映射和 CLI 工具自测。
@@ -60,8 +60,8 @@ reports/ci/coverage.xml
 ## 当前没有纳入基础门禁的测试
 
 ```text
-test_frontend.py：需要 Playwright 浏览器
-test_selenium.py：需要浏览器和 WebDriver
+tests/ui/test_frontend.py：需要 Playwright 浏览器
+tests/ui/test_selenium.py：需要浏览器和 WebDriver
 smoke_http.py：需要先启动 Uvicorn
 locustfile.py：属于性能测试，不应作为每次提交的快速门禁
 JMeter：属于独立性能测试计划
@@ -76,9 +76,9 @@ JMeter：属于独立性能测试计划
 ```powershell
 New-Item -ItemType Directory -Force reports\ci
 python -m pytest `
-  test_api.py `
-  test_observability.py `
-  test_qa_tool.py `
+  tests/api/test_api.py `
+  tests/api/test_observability.py `
+  tests/tools/test_qa_tool.py `
   --cov=main `
   --cov-report=term-missing `
   --cov-report=xml:reports/ci/coverage.xml `
@@ -211,7 +211,7 @@ origin/main  GitHub 上的远程分支
 本地先执行（不需要启动Ollama）：
 
 ```powershell
-python -m pytest test_agent_mvp.py test_agent_rag.py test_agent_ollama.py test_agent_evaluation.py -m "not integration" -q -s
+python -m pytest tests/agent/test_agent_mvp.py tests/agent/test_agent_rag.py tests/agent/test_agent_ollama.py tests/agent/test_agent_evaluation.py -m "not integration" -q -s
 python agent_evaluation.py --planner offline --output-dir reports/ci-agent/evaluation
 $LASTEXITCODE
 ```

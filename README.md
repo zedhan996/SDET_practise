@@ -58,7 +58,7 @@ $env:APP_DATABASE_URL = "sqlite:///./data/app/dev.db"
 迁移后的验证命令（由学习者执行，不需要启动Ollama或Uvicorn）：
 
 ```powershell
-python -m pytest test_api.py test_observability.py test_qa_tool.py -q -s
+python -m pytest tests/api/test_api.py tests/api/test_observability.py tests/tools/test_qa_tool.py -q -s
 ```
 
 数据库文件与SQLite配套日志都由 `.gitignore` 忽略，Git只提交程序、测试和说明。
@@ -146,7 +146,7 @@ Copy-Item .env.example .env
 Dockerfile和compose.yaml不保存真实密钥。然后先运行本地契约测试和配置检查：
 
 ```powershell
-python -m pytest test_api.py -q -s
+python -m pytest tests/api/test_api.py -q -s
 docker compose config
 ```
 
@@ -234,7 +234,7 @@ Smoke 脚本先在有限次数内等待 `/health` 就绪，再通过真实 HTTP 
 python smoke_http.py --base-url http://127.0.0.1:8002 --health-attempts 10 --health-interval 1
 ```
 
-全部通过返回退出码 `0`；健康检查耗尽或任一业务断言失败返回 `1`；非法重试参数返回 `2`。发布流水线可以根据退出码决定继续交付还是阻断。脚本自身的离线单元测试位于 `test_smoke_http.py`，不会访问真实服务。
+全部通过返回退出码 `0`；健康检查耗尽或任一业务断言失败返回 `1`；非法重试参数返回 `2`。发布流水线可以根据退出码决定继续交付还是阻断。脚本自身的离线单元测试位于 `tests/smoke/test_smoke_http.py`，不会访问真实服务。
 
 ## 使用测试效能 CLI
 
@@ -246,7 +246,7 @@ python qa_tool.py test --keyword login
 python qa_tool.py test --last-failed
 ```
 
-CLI 本身的测试位于 `test_qa_tool.py`，覆盖帮助信息、环境检查、测试筛选和非法参数退出码。
+CLI 本身的测试位于 `tests/tools/test_qa_tool.py`，覆盖帮助信息、环境检查、测试筛选和非法参数退出码。
 
 2026-08-19 在 Python 3.11.15 环境中的实测基线：
 
@@ -261,7 +261,7 @@ CLI 本身的测试位于 `test_qa_tool.py`，覆盖帮助信息、环境检查�
 固定15条任务，复用现有Planner、Registry和RAG门禁，统计任务通过率、工具调用成功率与端到端耗时：
 
 ```powershell
-python -m pytest test_agent_evaluation.py -q -s
+python -m pytest tests/agent/test_agent_evaluation.py -q -s
 python agent_evaluation.py
 ```
 
@@ -276,19 +276,20 @@ python agent_evaluation.py
 ```text
 .
 |-- main.py           FastAPI 服务端、数据模型和接口实现
-|-- test_api.py       pytest 接口自动化测试
-|-- test_frontend.py  Playwright 真实浏览器 UI 测试
+|-- tests/api/        API接口与可观测性测试
+|-- tests/ui/         Playwright与Selenium真实浏览器UI测试
 |-- smoke_http.py     需要真实服务的 HTTP Smoke 测试
-|-- test_smoke_http.py Smoke等待、业务调用和退出码的离线单元测试
+|-- tests/smoke/      Smoke等待、业务调用和退出码的离线单元测试
+|-- tests/mcp/        MCP参数、权限和超时边界测试
 |-- qa_tool.py        测试效能 CLI 工具
-|-- test_qa_tool.py   CLI 工具自身的测试
+|-- tests/tools/      CLI工具自身的测试
 |-- agent_mvp.py      Agent 工具调用 MVP 和商品查询工具
-|-- test_agent_mvp.py Agent MVP 的契约、边界和 trace 测试
+|-- tests/agent/      Agent工具、RAG接入、Planner和评测测试
+|-- tests/rag/        RAG切片、检索、重排、生成和集成测试
 |-- agent_rag.py      把受控 RAG 检索注册为 Agent 工具
 |-- agent_ollama.py   使用本机 Qwen 生成原生 Tool Calling 计划
 |-- agent_evaluation.py 版本化Agent行为评测、三项指标与报告
 |-- agent_evaluation_fixtures.py 隔离的固定数据与故障注入
-|-- test_agent_evaluation.py 评测case及Harness自身的测试
 |-- eval_cases/       版本化的Agent/RAG评测输入与预期结果
 |-- rag_mvp.py        文档切分、Embedding、Chroma 写入和检索
 |-- rag_query.py      Top-k、Reranker 和拒答门禁查询入口

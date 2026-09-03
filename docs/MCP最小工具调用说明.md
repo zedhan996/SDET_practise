@@ -23,7 +23,7 @@ mcp_catalog_server.py
 - `mcp_catalog_server.py`：只将 `get_item` 注册为 MCP 工具，复用原 Registry 和查询函数。
 - `mcp_catalog_client.py`：发现工具、打印 Schema、发起一次调用并断言返回的商品 ID。
 - `requirements-mcp.txt`：可选依赖，使用官方 SDK 2.x；不修改基础 CI 的安装范围。
-- `test_mcp_catalog.py`：同进程的 MCP 参数校验、权限拒绝与工具超时测试。
+- `tests/mcp/test_mcp_catalog.py`：同进程的 MCP 参数校验、权限拒绝与工具超时测试。
 
 ## 学习者执行
 
@@ -60,7 +60,7 @@ python mcp_catalog_client.py --item-id 101
 ## 三类失败测试（待学习者运行）
 
 ```powershell
-python -m pytest test_mcp_catalog.py -v -s
+python -m pytest tests/mcp/test_mcp_catalog.py -v -s
 ```
 
 | 测试 | 如何制造条件 | 关键断言 |

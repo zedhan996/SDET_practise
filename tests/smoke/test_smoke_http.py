@@ -95,3 +95,4 @@ def test_main_rejects_invalid_retry_configuration():
     exit_code = smoke_http.main(["--health-attempts", "0"])
 
     assert exit_code == 2
+

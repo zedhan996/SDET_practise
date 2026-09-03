@@ -32,10 +32,10 @@ jobs:
         run: |
           mkdir -p reports/ci
           python -m pytest \
-            test_api.py \
-            test_observability.py \
-            test_qa_tool.py \
-            test_smoke_http.py \
+            tests/api/test_api.py \
+            tests/api/test_observability.py \
+            tests/tools/test_qa_tool.py \
+            tests/smoke/test_smoke_http.py \
             --cov=main \
             --cov-report=term-missing \
             --cov-report=xml:reports/ci/coverage.xml \
@@ -84,7 +84,7 @@ jobs:
       - name: Run Agent unit regression
         run: |
           mkdir -p reports/ci-agent
-          python -m pytest test_agent_mvp.py test_agent_rag.py test_agent_ollama.py test_agent_evaluation.py \
+          python -m pytest tests/agent/test_agent_mvp.py tests/agent/test_agent_rag.py tests/agent/test_agent_ollama.py tests/agent/test_agent_evaluation.py \
             -m "not integration" -q \
             --junitxml=reports/ci-agent/junit.xml
 

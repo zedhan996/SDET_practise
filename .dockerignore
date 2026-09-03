@@ -25,7 +25,7 @@ pytest.ini
 requirements*.txt
 !requirements-runtime.txt
 !requirements-container-test.txt
-!test_api.py
+!tests/api/test_api.py
 !conftest.py
 !pytest-container.ini
 performance

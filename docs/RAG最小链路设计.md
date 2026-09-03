@@ -89,7 +89,7 @@ python rag_query.py "没有登录令牌时接口应该返回什么？" --thresho
 知识片段、来源、版本和检索结果契约。
 
 项目现已通过 `build_sentence_transformer_embedding()` 接入多语言真实语义模型。
-普通单元测试继续使用本地哈希替身；`test_rag_semantic.py` 只在明确设置
+普通单元测试继续使用本地哈希替身；`tests/rag/test_rag_semantic.py` 只在明确设置
 `RUN_RAG_INTEGRATION=1` 时加载真实模型。
 
 ## 余弦距离和低相关拒答
@@ -245,7 +245,7 @@ Cross-Encoder Reranker
 
 ```powershell
 $env:RUN_OLLAMA_INTEGRATION = "1"
-python -m pytest test_rag_ollama_integration.py -m integration -q -s
+python -m pytest tests/rag/test_rag_ollama_integration.py -m integration -q -s
 Remove-Item Env:RUN_OLLAMA_INTEGRATION
 ```
 

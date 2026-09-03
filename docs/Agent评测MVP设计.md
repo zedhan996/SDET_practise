@@ -211,7 +211,7 @@ agent_mvp.py
     search_items 和 get_item 工具
     OfflineQueryAgent
 
-test_agent_mvp.py
+tests/agent/test_agent_mvp.py
     工具契约
     真实数据库查询
     参数错误
@@ -227,13 +227,13 @@ agent_ollama.py
     模型tool_calls响应解析
     规划阶段超时、连接失败和异常响应映射
 
-test_agent_ollama.py
+tests/agent/test_agent_ollama.py
     工具Schema转换
     权限与trace不发送给模型
     白名单、权限和坏参数二次防线
     无工具、多工具、超时和服务不可用
 
-test_agent_ollama_integration.py
+tests/agent/test_agent_ollama_integration.py
     真实Qwen商品工具选择
     真实Qwen知识工具选择
 ```
@@ -242,7 +242,7 @@ test_agent_ollama_integration.py
 
 ## 当前验证结果
 
-`test_agent_mvp.py` 与 `test_agent_rag.py` 分别覆盖基础工具边界和 Agent-RAG 分流；实际
+`tests/agent/test_agent_mvp.py` 与 `tests/agent/test_agent_rag.py` 分别覆盖基础工具边界和 Agent-RAG 分流；实际
 通过数量以当前测试命令输出为准，不在文档中长期保存容易过期的固定数字。
 
 当前还没有完成：

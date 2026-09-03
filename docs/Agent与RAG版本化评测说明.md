@@ -10,7 +10,7 @@
 | `eval_cases/agent_rag_v1.json` | 15条用户任务、权限、预期工具/参数/结果，以及人工复核标记 |
 | `agent_evaluation_fixtures.py` | 固定商品、候选片段、分数和故障注入；每条case重新构建环境 |
 | `agent_evaluation.py` | 校验用例文件、复用已有Harness执行、计算指标、生成报告 |
-| `test_agent_evaluation.py` | 检查15条行为case，以及评测器的断言、指标、报告和退出码 |
+| `tests/agent/test_agent_evaluation.py` | 检查15条行为case，以及评测器的断言、指标、报告和退出码 |
 
 `agent_mvp.py` 的 `evaluate_case()` 新增结果内容检查和端到端计时。
 真实商品数据库改为调用商品工具时才导入；独立评测脚本不再因导入Agent就初始化开发库。
@@ -70,7 +70,7 @@ TIMEOUT case只是故障结果注入，不证明真实等待时长或线程已�
 在项目根目录的 `learning_zero` 环境执行，不需要启动Ollama或Uvicorn：
 
 ```powershell
-python -m pytest test_agent_mvp.py test_agent_rag.py test_agent_ollama.py test_agent_evaluation.py -q -s
+python -m pytest tests/agent/test_agent_mvp.py tests/agent/test_agent_rag.py tests/agent/test_agent_ollama.py tests/agent/test_agent_evaluation.py -q -s
 python agent_evaluation.py
 ```
 
@@ -131,7 +131,7 @@ v0保留原始说明；v1补充工具分工和查询改写约束，是待验证�
 先运行单元回归（不需要Ollama）：
 
 ```powershell
-python -m pytest test_agent_mvp.py test_agent_rag.py test_agent_ollama.py test_agent_evaluation.py -q -s
+python -m pytest tests/agent/test_agent_mvp.py tests/agent/test_agent_rag.py tests/agent/test_agent_ollama.py tests/agent/test_agent_evaluation.py -q -s
 ```
 
 启动Ollama后，保持模型、用例、工具契约和依赖行为一致，分别运行：

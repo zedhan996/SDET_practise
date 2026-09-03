@@ -53,7 +53,7 @@ def run_environment_check():
     checks = [
         check_python_version(),
         check_required_file("main.py"),
-        check_required_file("test_api.py"),
+        check_required_file("tests/api/test_api.py"),
         check_required_file("requirements.txt"),
         check_dependency("fastapi"),
         check_dependency("pytest"),
@@ -76,7 +76,7 @@ def build_pytest_command(args):
         sys.executable,
         "-m",
         "pytest",
-        str(PROJECT_ROOT / "test_api.py"),
+        str(PROJECT_ROOT / "tests" / "api" / "test_api.py"),
         "-q",
     ]
 

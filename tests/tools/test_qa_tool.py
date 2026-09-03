@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 
 
-PROJECT_ROOT = Path(__file__).resolve().parent
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 QA_TOOL = PROJECT_ROOT / "qa_tool.py"
 
 
