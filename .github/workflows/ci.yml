@@ -121,14 +121,18 @@ jobs:
           if-no-files-found: ignore
 
   docker-delivery:
-    name: Docker delivery candidate gate
+    name: Docker delivery and GHCR publish
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: [test, agent-offline]
+    permissions:
+      contents: read
+      packages: write
     env:
       # 仅供一次性CI容器使用，不是生产Secret，也不写入镜像。
       APP_SECRET_KEY: ci-only-secret-key-at-least-32-characters
       APP_ADMIN_TOKEN: ci-only-admin-token
+      IMAGE_NAME: ghcr.io/zedhan996/sdet-practise-api
 
     steps:
       - name: Check out repository
@@ -172,6 +176,30 @@ jobs:
         run: |
           test "$(curl --fail --silent http://127.0.0.1:8001/health)" = '{"status":"ok","service":"sdet-fastapi"}'
           test "$(curl --fail --silent http://127.0.0.1:8001/)" = '{"message":"Hello, SDET!"}'
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish tested image to GHCR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: bash
+        run: |
+          sha_tag="${IMAGE_NAME}:sha-${GITHUB_SHA}"
+          latest_tag="${IMAGE_NAME}:latest"
+          docker tag sdet-fastapi:local "${sha_tag}"
+          docker tag sdet-fastapi:local "${latest_tag}"
+          docker push "${sha_tag}"
+          docker push "${latest_tag}"
+          {
+            echo "### Published container image"
+            echo "- \`${sha_tag}\`"
+            echo "- \`${latest_tag}\`"
+          } >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Show container evidence on failure
         if: failure()

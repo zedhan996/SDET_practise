@@ -14,7 +14,7 @@ pytest与Agent门禁通过
 → 验证真实HTTP响应
 ```
 
-当前没有推送镜像仓库，也没有部署到真实服务器，因此属于持续交付的基础门禁，不是完整的持续部署。
+通过全部门禁后，`main` 分支的 push 会把本轮实际验收过的正式镜像推送到 GHCR。当前没有部署到真实服务器，因此属于 Continuous Delivery（持续交付），不是完整的 Continuous Deployment（持续部署）。
 
 ## Job 依赖关系
 
@@ -37,11 +37,47 @@ needs: [test, agent-offline]
 7. 失败时输出容器状态和日志，便于定位。
 8. 无论成功失败都清理 GitHub Runner 中的一次性容器和数据卷。
 
+## GHCR 镜像发布
+
+发布地址：
+
+```text
+ghcr.io/zedhan996/sdet-practise-api
+```
+
+每次发布生成两个标签：
+
+```text
+sha-<完整Git提交哈希>  精确对应一次提交，不应被覆盖
+latest                  指向main分支最近一次成功交付
+```
+
+流水线先完成容器测试和 HTTP 验收，再为本地 `sdet-fastapi:local` 镜像添加 GHCR 标签并推送，因此发布的是已经验收过的同一镜像，而不是发布后重新构建另一份镜像。
+
+只有以下条件同时满足才发布：
+
+```text
+事件是push
+且分支是main
+```
+
+Pull Request 和手动运行只执行构建与验收，不推送镜像，避免未合并代码生成正式交付标签。
+
+认证使用 GitHub 自动提供的短期 `GITHUB_TOKEN`，Docker Job 只获得 `contents: read` 和 `packages: write` 权限，不在仓库中保存用户名密码或长期 Token。
+
+首次发布后，GHCR Package 可能默认为 Private。若需要让其他设备无需登录即可拉取，应在 GitHub Package 设置中明确改为 Public；公开前先再次确认镜像不包含 Secret。
+
+公开镜像的拉取命令为：
+
+```powershell
+docker pull ghcr.io/zedhan996/sdet-practise-api:latest
+```
+
 ## Secret 边界
 
 流水线中的 `APP_SECRET_KEY` 和 `APP_ADMIN_TOKEN` 是一次性 CI 测试值，不是生产密钥。它们只在容器启动时通过环境变量注入，不参与 Dockerfile 构建，也不会被写入镜像。
 
-未来接入真实部署时，应使用 GitHub Actions Secrets 或目标平台的密钥管理服务，不能在工作流文件中填写生产 Secret。
+未来接入真实部署时，应使用 GitHub Actions Secrets 或目标平台的密钥管理服务，不能在工作流文件中填写生产 Secret。`GITHUB_TOKEN` 由 GitHub 为单次工作流临时签发，不等于代码仓库中的真实业务 Secret。
 
 ## 失败定位
 

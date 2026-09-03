@@ -181,7 +181,7 @@ docker compose --profile test run --build --rm api-tests
 
 `api-tests` 使用 Dockerfile 的独立测试阶段，额外安装 pytest、httpx 和 pytest-mock；正式 `api` 镜像不包含这些测试依赖和测试代码。
 
-GitHub Actions 在传统 pytest 与 Agent 离线门禁均通过后，还会自动构建正式镜像、检查镜像边界、执行容器测试、启动 API 并验证 `/health` 与 `/`。当前不会发布镜像或部署真实服务器，具体见 [Docker持续交付门禁说明](docs/Docker持续交付门禁说明.md)。
+GitHub Actions 在传统 pytest 与 Agent 离线门禁均通过后，还会自动构建正式镜像、检查镜像边界、执行容器测试、启动 API 并验证 `/health` 与 `/`。`main` 分支 push 通过全部门禁后，会将同一份已验收镜像发布到 `ghcr.io/zedhan996/sdet-practise-api`；当前不会自动部署真实服务器，具体见 [Docker持续交付门禁说明](docs/Docker持续交付门禁说明.md)。
 
 只有明确需要清空容器数据库时才使用 `docker compose down --volumes`；这会删除本项目命名卷，
 属于数据删除操作，不作为普通停止命令。宿主机原有 `data/app/dev.db` 不会复制进镜像，
