@@ -10,7 +10,24 @@ import sys
 from mcp import Client, StdioServerParameters
 
 
-PROJECT_ROOT = Path(__file__).resolve().parent
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+
+def build_server_parameters(database: Path, secret: str) -> StdioServerParameters:
+    """构造服务端启动配置，不启动进程，便于单独验证入口和路径。"""
+    # 明确选择应用库，避免继承其他终端残留的测试库配置；不传递无关密钥。
+    return StdioServerParameters(
+        command=sys.executable,
+        args=["-u", "-m", "app.mcp.server"],
+        cwd=str(PROJECT_ROOT),
+        env={
+            "APP_ENV": "development",
+            "APP_DATABASE_URL": f"sqlite:///{database.as_posix()}",
+            "APP_SECRET_KEY": secret,
+            "PYTHONIOENCODING": "utf-8",
+            "PYTHONUTF8": "1",
+        },
+    )
 
 
 async def main(item_id: int) -> None:
@@ -21,20 +38,7 @@ async def main(item_id: int) -> None:
     secret = os.environ.get("APP_SECRET_KEY")
     if not secret:
         raise RuntimeError("请先设置 APP_SECRET_KEY，原应用初始化需要此配置。")
-
-    # 明确选择应用库，避免继承其他终端残留的测试库配置；不传递无关密钥。
-    parameters = StdioServerParameters(
-        command=sys.executable,
-        args=["-u", str(PROJECT_ROOT / "mcp_catalog_server.py")],
-        cwd=str(PROJECT_ROOT),
-        env={
-            "APP_ENV": "development",
-            "APP_DATABASE_URL": f"sqlite:///{database.as_posix()}",
-            "APP_SECRET_KEY": secret,
-            "PYTHONIOENCODING": "utf-8",
-            "PYTHONUTF8": "1",
-        },
-    )
+    parameters = build_server_parameters(database, secret)
     # 给整个冒烟流程设定等待上限；这与 Registry 的单工具超时是两层限制。
     async with asyncio.timeout(30), Client(parameters) as client:
         discovered = await client.list_tools()

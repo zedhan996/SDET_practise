@@ -284,6 +284,7 @@ python -m app.agent.evaluation
 |-- qa_tool.py        测试效能 CLI 工具
 |-- tests/tools/      CLI工具自身的测试
 |-- app/agent/        Agent工具调用、RAG接入、Planner与评测源码
+|-- app/mcp/          MCP商品查询服务端和stdio客户端
 |-- tests/agent/      Agent工具、RAG接入、Planner和评测测试
 |-- tests/rag/        RAG切片、检索、重排、生成和集成测试
 |-- eval_cases/       版本化的Agent/RAG评测输入与预期结果

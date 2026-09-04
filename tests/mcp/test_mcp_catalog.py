@@ -9,7 +9,7 @@ from mcp.types import TextContent
 import pytest
 
 from app.agent.mvp import GET_ITEM_SCHEMA, ToolRegistry, ToolSpec
-import mcp_catalog_server as server
+from app.mcp import server
 
 
 @pytest.fixture

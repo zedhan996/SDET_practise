@@ -6,9 +6,9 @@ MCP（Model Context Protocol，模型上下文协议）提供标准化的工具�
 第一轮只暴露已有的 `get_item`，先验证独立客户端能发现工具、读取 Schema 并查询商品。
 
 ```text
-mcp_catalog_client.py
+app/mcp/client.py
     → 标准输入/输出管道（stdio），跨进程传递 MCP 消息
-mcp_catalog_server.py
+app/mcp/server.py
     → ToolRegistry 校验权限、参数并执行
 原有 get_item_tool
     → 应用库 data/app/dev.db
@@ -20,8 +20,9 @@ mcp_catalog_server.py
 
 ## 文件职责
 
-- `mcp_catalog_server.py`：只将 `get_item` 注册为 MCP 工具，复用原 Registry 和查询函数。
-- `mcp_catalog_client.py`：发现工具、打印 Schema、发起一次调用并断言返回的商品 ID。
+- `app/mcp/server.py`：只将 `get_item` 注册为 MCP 工具，复用原 Registry 和查询函数。
+- `app/mcp/client.py`：发现工具、打印 Schema、发起一次调用并断言返回的商品 ID。
+- `tests/mcp/test_client_launch.py`：验证模块启动入口、工作目录和传入的环境配置，不启动子进程。
 - `requirements-mcp.txt`：可选依赖，使用官方 SDK 2.x；不修改基础 CI 的安装范围。
 - `tests/mcp/test_mcp_catalog.py`：同进程的 MCP 参数校验、权限拒绝与工具超时测试。
 
@@ -40,8 +41,11 @@ python -m pip check
 if (-not $env:APP_SECRET_KEY) {
     $env:APP_SECRET_KEY = [guid]::NewGuid().ToString("N")
 }
-python mcp_catalog_client.py --item-id 101
+python -m app.mcp.client --item-id 101
 ```
+
+客户端使用当前 Python 解释器执行 `-u -m app.mcp.server`，子进程工作目录固定为项目根目录。
+移动源码不会移动数据库，仍访问 `data/app/dev.db`；通信方式仍为 stdio，不是 HTTP。
 
 预期发现 `get_item`，Schema 要求整数 `item_id`，返回结果中的商品 ID 为 101，最后打印 PASS。
 实际商品名称和价格来自应用库，不是 SQL 实验库。若商品 101 已被删除，应选择应用库中真实存在的 ID，不能把不存在的商品也断言为成功。
