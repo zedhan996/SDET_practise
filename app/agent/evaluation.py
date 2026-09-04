@@ -15,17 +15,17 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from agent_evaluation_fixtures import (
+from .evaluation_fixtures import (
     FIXTURE_PROFILES,
     FIXTURE_VERSION,
     INJECTED_PLANS,
     build_evaluation_environment,
 )
-from agent_mvp import EvaluationCase, evaluate_case
-from agent_ollama import get_planner_prompt
+from .mvp import EvaluationCase, evaluate_case
+from .ollama import get_planner_prompt
 
 
-PROJECT_ROOT = Path(__file__).resolve().parent
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CASES_PATH = PROJECT_ROOT / "eval_cases" / "agent_rag_v1.json"
 DEFAULT_REPORT_DIRECTORY = PROJECT_ROOT / "reports" / "agent"
 CATEGORIES = {

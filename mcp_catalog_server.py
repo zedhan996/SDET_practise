@@ -8,7 +8,7 @@ from mcp.server import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from pydantic import StrictInt
 
-from agent_mvp import ToolCall, build_catalog_registry
+from app.agent.mvp import ToolCall, build_catalog_registry
 
 
 mcp = MCPServer("sdet-catalog")

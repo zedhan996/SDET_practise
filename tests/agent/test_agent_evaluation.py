@@ -8,8 +8,8 @@ from dataclasses import replace
 
 import pytest
 
-import agent_evaluation
-from agent_evaluation import (
+from app.agent import evaluation as agent_evaluation
+from app.agent.evaluation import (
     CATEGORIES,
     DEFAULT_CASES_PATH,
     load_suite,
@@ -18,8 +18,8 @@ from agent_evaluation import (
     summarize_results,
     write_reports,
 )
-from agent_evaluation_fixtures import build_evaluation_environment
-from agent_mvp import (
+from app.agent.evaluation_fixtures import build_evaluation_environment
+from app.agent.mvp import (
     EvaluationCase,
     ToolCall,
     ToolCallingAgent,
@@ -191,7 +191,7 @@ def test_end_to_end_timer_includes_planning(monkeypatch):
                 trace=TraceEvent(call.trace_id, call.tool_name, "success", 100.0),
             )
 
-    monkeypatch.setattr("agent_mvp.time.perf_counter", lambda: clock["now"])
+    monkeypatch.setattr("app.agent.mvp.time.perf_counter", lambda: clock["now"])
     case = EvaluationCase(
         "timer", "查询商品 ID 101", frozenset({"catalog:read"}),
         expected_tool="get_item",
@@ -362,7 +362,7 @@ def test_offline_report_does_not_claim_prompt_evaluation(offline_report, suite):
 def test_prompt_version_reaches_planner_and_report(suite, monkeypatch, tmp_path, version):
     """用假HTTP响应串起版本传递与报告落盘，注入用例仍不标记提示词版本。"""
     import hashlib
-    from agent_ollama import OllamaToolPlanner, get_planner_prompt
+    from app.agent.ollama import OllamaToolPlanner, get_planner_prompt
 
     monkeypatch.setenv("RUN_OLLAMA_INTEGRATION", "1")
     captured = []

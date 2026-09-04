@@ -2,15 +2,15 @@ import os
 
 import pytest
 
-from agent_mvp import (
+from app.agent.mvp import (
     GET_ITEM_SCHEMA,
     SEARCH_ITEMS_SCHEMA,
     ToolCallingAgent,
     ToolRegistry,
     ToolSpec,
 )
-from agent_ollama import OllamaToolPlanner
-from agent_rag import SEARCH_KNOWLEDGE_SCHEMA
+from app.agent.ollama import OllamaToolPlanner
+from app.agent.rag import SEARCH_KNOWLEDGE_SCHEMA
 
 
 ALL_READ = frozenset({"catalog:read", "knowledge:read"})

@@ -1,5 +1,5 @@
-from agent_mvp import ToolCall, ToolCallingAgent
-from agent_rag import (
+from app.agent.mvp import ToolCall, ToolCallingAgent
+from app.agent.rag import (
     OfflineCatalogKnowledgePlanner,
     RagKnowledgeToolHandler,
     build_catalog_knowledge_registry,

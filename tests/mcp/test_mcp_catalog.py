@@ -8,7 +8,7 @@ from mcp import Client
 from mcp.types import TextContent
 import pytest
 
-from agent_mvp import GET_ITEM_SCHEMA, ToolRegistry, ToolSpec
+from app.agent.mvp import GET_ITEM_SCHEMA, ToolRegistry, ToolSpec
 import mcp_catalog_server as server
 
 

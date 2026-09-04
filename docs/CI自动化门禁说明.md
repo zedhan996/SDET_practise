@@ -200,7 +200,7 @@ origin/main  GitHub 上的远程分支
 
 1. 安装基础依赖和Chroma 1.5.9，不安装Sentence Transformers、不下载模型权重。
 2. 执行Agent、Agent/RAG、Ollama请求包装和评测器的单元测试，HTTP使用替身。
-3. 执行 `python agent_evaluation.py --planner offline`，运行固定15条版本化行为用例。
+3. 执行 `python -m app.agent.evaluation --planner offline`，运行固定15条版本化行为用例。
 4. 任意任务断言失败则退出1，配置错误退出2，均会令CI失败；全部通过退出0。
 5. 无论成功或失败都尝试上传已生成的 `agent-offline-reports` 制品。
 
@@ -212,7 +212,7 @@ origin/main  GitHub 上的远程分支
 
 ```powershell
 python -m pytest tests/agent/test_agent_mvp.py tests/agent/test_agent_rag.py tests/agent/test_agent_ollama.py tests/agent/test_agent_evaluation.py -m "not integration" -q -s
-python agent_evaluation.py --planner offline --output-dir reports/ci-agent/evaluation
+python -m app.agent.evaluation --planner offline --output-dir reports/ci-agent/evaluation
 $LASTEXITCODE
 ```
 

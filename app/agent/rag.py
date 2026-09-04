@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 
-from agent_mvp import (
+from .mvp import (
     OfflineQueryPlanner,
     PermissionSet,
     ToolCall,

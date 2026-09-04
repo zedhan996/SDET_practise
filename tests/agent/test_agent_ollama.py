@@ -4,8 +4,8 @@ import pytest
 from typing import Any
 from urllib import error as url_error
 
-from agent_mvp import ToolCallingAgent, ToolRegistry, ToolSpec
-from agent_ollama import OllamaToolPlanner, OLLAMA_PLANNER_SYSTEM_PROMPT, get_planner_prompt
+from app.agent.mvp import ToolCallingAgent, ToolRegistry, ToolSpec
+from app.agent.ollama import OllamaToolPlanner, OLLAMA_PLANNER_SYSTEM_PROMPT, get_planner_prompt
 
 
 CATALOG_READ = frozenset({"catalog:read"})

@@ -6,7 +6,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any
 
-from agent_mvp import (
+from .mvp import (
     GET_ITEM_SCHEMA,
     SEARCH_ITEMS_SCHEMA,
     ToolCallingAgent,
@@ -14,7 +14,7 @@ from agent_mvp import (
     ToolRegistry,
     ToolSpec,
 )
-from agent_rag import (
+from .rag import (
     SEARCH_KNOWLEDGE_SCHEMA,
     OfflineCatalogKnowledgePlanner,
     RagKnowledgeToolHandler,
@@ -169,7 +169,7 @@ def build_evaluation_environment(
         planner = ScriptedPlanner(INJECTED_PLANS[profile])
         planner_kind = "injected_output"
     elif planner_mode == "ollama":
-        from agent_ollama import OllamaToolPlanner
+        from .ollama import OllamaToolPlanner
 
         planner = OllamaToolPlanner.from_registry(registry, prompt_version=prompt_version)
         planner_kind = "ollama"

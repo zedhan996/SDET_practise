@@ -34,7 +34,7 @@
 | `search_items` | `keyword: string/null`、`max_price: number/null` | `catalog:read` | 商品列表和数量 |
 | `get_item` | `item_id: integer` | `catalog:read` | 单个商品详情 |
 
-工具定义位于 `agent_mvp.py` 的 `ToolSpec` 中，输入契约由 `SEARCH_ITEMS_SCHEMA` 和 `GET_ITEM_SCHEMA` 表示。当前验证的 Schema 关键字包括：
+工具定义位于 `app/agent/mvp.py` 的 `ToolSpec` 中，输入契约由 `SEARCH_ITEMS_SCHEMA` 和 `GET_ITEM_SCHEMA` 表示。当前验证的 Schema 关键字包括：
 
 ```text
 type
@@ -131,7 +131,7 @@ ToolRegistry
 
 这样模型只能提出调用意图，不能绕过程序直接执行 Python 函数。测开可以分别验证 Planner 的工具选择，以及 Executor 的安全边界。
 
-项目现已增加 `agent_rag.py`，把现有 RAG 门禁注册为第三个只读工具：
+项目现已增加 `app/agent/rag.py`，把现有 RAG 门禁注册为第三个只读工具：
 
 ```text
 search_items       catalog:read     查询商品列表
@@ -146,7 +146,7 @@ search_knowledge   knowledge:read   检索规则知识
 
 ## 真实 Qwen Planner
 
-`agent_ollama.py` 已经把本机 `qwen3:4b-instruct` 接到相同的 `ToolPlanner`
+`app/agent/ollama.py` 已经把本机 `qwen3:4b-instruct` 接到相同的 `ToolPlanner`
 接口。它通过 Ollama `/api/chat` 的原生 `tools` 和 `message.tool_calls` 完成一次工具选择：
 
 ```text
@@ -196,7 +196,7 @@ trace_id
 
 `evaluate_cases()` 可以按顺序运行一批用例，后续还可以在不改变用例格式的情况下，替换 Planner、比较不同 Prompt 或接入真实模型。当前评测使用确定性断言，不使用 LLM Judge。
 
-新增的 `agent_evaluation.py` 从 `eval_cases/agent_rag_v1.json` 加载15条版本化任务，
+`app/agent/evaluation.py` 从 `eval_cases/agent_rag_v1.json` 加载15条版本化任务，
 复用 `evaluate_case()` 并增加处理函数调用次数检查、聚合指标和JSON/Markdown报告。
 `end_to_end_ms` 记录Planner到Registry结果的耗时，不再把工具trace耗时当作完整链路耗时。
 默认使用固定依赖，不代表真实语义检索质量；人工复核初始为待完成。
@@ -205,7 +205,7 @@ trace_id
 ## 当前代码与测试
 
 ```text
-agent_mvp.py
+app/agent/mvp.py
     ToolSpec、ToolCall、TraceEvent
     ToolRegistry
     search_items 和 get_item 工具
@@ -222,7 +222,7 @@ tests/agent/test_agent_mvp.py
     trace
     两种自然语言查询路由
 
-agent_ollama.py
+app/agent/ollama.py
     Ollama原生Tool Calling请求
     模型tool_calls响应解析
     规划阶段超时、连接失败和异常响应映射

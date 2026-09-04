@@ -10,7 +10,7 @@ from urllib import error as url_error
 from urllib import request as url_request
 from urllib.parse import urlparse
 
-from agent_mvp import (
+from .mvp import (
     PermissionSet,
     ToolExecutionError,
     ToolRegistry,

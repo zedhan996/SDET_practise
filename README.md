@@ -262,7 +262,7 @@ CLI 本身的测试位于 `tests/tools/test_qa_tool.py`，覆盖帮助信息、�
 
 ```powershell
 python -m pytest tests/agent/test_agent_evaluation.py -q -s
-python agent_evaluation.py
+python -m app.agent.evaluation
 ```
 
 默认采用规则Planner与固定测试依赖，不需要启动Ollama，不访问开发库或持久化知识库。
@@ -283,13 +283,9 @@ python agent_evaluation.py
 |-- tests/mcp/        MCP参数、权限和超时边界测试
 |-- qa_tool.py        测试效能 CLI 工具
 |-- tests/tools/      CLI工具自身的测试
-|-- agent_mvp.py      Agent 工具调用 MVP 和商品查询工具
+|-- app/agent/        Agent工具调用、RAG接入、Planner与评测源码
 |-- tests/agent/      Agent工具、RAG接入、Planner和评测测试
 |-- tests/rag/        RAG切片、检索、重排、生成和集成测试
-|-- agent_rag.py      把受控 RAG 检索注册为 Agent 工具
-|-- agent_ollama.py   使用本机 Qwen 生成原生 Tool Calling 计划
-|-- agent_evaluation.py 版本化Agent行为评测、三项指标与报告
-|-- agent_evaluation_fixtures.py 隔离的固定数据与故障注入
 |-- eval_cases/       版本化的Agent/RAG评测输入与预期结果
 |-- rag_mvp.py        文档切分、Embedding、Chroma 写入和检索
 |-- rag_query.py      Top-k、Reranker 和拒答门禁查询入口

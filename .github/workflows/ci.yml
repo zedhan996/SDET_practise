@@ -111,7 +111,7 @@ jobs:
       - name: Require all versioned behavior cases to pass
         # 固定15条用例的任务通过率门槛为100%；不把工具成功率50%误判为失败。
         # 任意任务失败，现有CLI返回1，使本步骤和整个job失败。
-        run: python agent_evaluation.py --planner offline --cases reports/ci-agent/input-cases.json --output-dir reports/ci-agent/evaluation
+        run: python -m app.agent.evaluation --planner offline --cases reports/ci-agent/input-cases.json --output-dir reports/ci-agent/evaluation
 
       - name: Upload Agent reports even on failure
         if: always()

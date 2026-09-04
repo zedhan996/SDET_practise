@@ -1,6 +1,6 @@
 import time
 
-from agent_mvp import (
+from app.agent.mvp import (
     EvaluationCase,
     OfflineQueryAgent,
     OfflineQueryPlanner,
