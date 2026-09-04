@@ -62,7 +62,7 @@ reports/ci/coverage.xml
 ```text
 tests/ui/test_frontend.py：需要 Playwright 浏览器
 tests/ui/test_selenium.py：需要浏览器和 WebDriver
-smoke_http.py：需要先启动 Uvicorn
+scripts/smoke_http.py：需要先启动服务，通过 python -m scripts.smoke_http 执行
 locustfile.py：属于性能测试，不应作为每次提交的快速门禁
 JMeter：属于独立性能测试计划
 ```
@@ -282,3 +282,39 @@ Error: Process completed with exit code 1.
 - 文档更新后由用户提交，将ci-gate-demo快进合并回main并推送；合并和main的新一轮CI仍待执行确认。
 - 练习分支暂时保留，以便查看红绿历史；不删除模型、数据库或报告。
 - 今晚到此收尾，不开始Docker/Compose；该任务留待下次学习。
+
+## 2026-09-05：Smoke 目录迁移验收与本地构建故障
+
+### 迁移范围
+
+- 根目录 `smoke_http.py` 迁入 `scripts/smoke_http.py`，新增 `scripts/__init__.py`。
+- 统一使用 `python -m scripts.smoke_http`；测试导入、mock 路径、README 和 CI 命令同步调整。
+- Dockerfile 的 test 阶段复制 scripts 包所需两个文件，runtime 阶段不包含 Smoke 脚本。
+- 不改变健康检查、业务断言、重试参数和退出码，不调整依赖版本。
+
+### 用户提供的本地验收结果
+
+| 检查 | 结果 |
+| --- | --- |
+| `python -m pytest tests/smoke -q -s` | 5 passed，0.07 秒 |
+| `docker compose --profile test run --rm api-tests` | 43 passed，1 warning，0.74 秒 |
+| 测试容器执行 `python -m scripts.smoke_http --help` | 正常输出帮助 |
+| 测试容器访问 `http://api:8000` | 健康检查、首页、登录、商品搜索全部通过，退出码 0 |
+
+单元测试中的 FAIL 文本来自故意模拟的失败场景，最终测试通过；Starlette/httpx 弃用警告单独作为维护项。
+真实 HTTP 验收说明新脚本可在测试容器中通过 Compose 网络访问 API，不代表本批提交的云端 CI 已通过。
+
+### 本次故障及结论边界
+
+1. `docker compose` 不被识别：安装目录中的 Compose 存在且可直接运行；用户插件目录无对应文件，`DOCKER_CONFIG` 未设置，额外插件目录无输出。复制安装自带的插件到正确用户目录后恢复。此前为何失效仍未查明。
+2. 随后的构建提示 Buildx 未被识别，并在第 15 步 `pip install -r requirements-container-test.txt` 出现 `Segmentation fault (core dumped)`，内部命令返回 139。
+3. 按恢复 Buildx、重试构建的步骤操作后，用户反馈构建成功，并提供了上表验收结果。不能将先后关系当作“缺少 Buildx 导致段错误”的证明。
+4. 139 通常表示 128 + 11，即 SIGSEGV；与此前导入/退出阶段的 `bool_dealloc` 异常同属底层崩溃线索，但不能确认两次是同一根因，更不能认定 Pydantic 或 httpx 是责任组件。
+5. 本次崩溃发生在依赖安装阶段，尚未复制或运行迁移后的脚本；没有证据表明目录重构导致崩溃。状态记录为“重试恢复，根因未定”，不是“永久修复”。
+
+若复发，先保存完整日志、失败步骤、镜像摘要、依赖版本、Docker/WSL 版本及重启前后结果，再做最小复现；不要先清空镜像、缓存或数据卷而丢失排查线索。
+手工复制的 CLI 插件副本可能需要随 Docker Desktop 升级同步维护。插件目录属于 Windows 用户环境，不是项目目录或容器数据卷。
+
+### 待收尾
+
+本批修改由用户提交并推送，再确认 GitHub Actions；本记录不提前宣称云端验证通过。

@@ -2,7 +2,7 @@ from unittest.mock import Mock, call
 
 import requests
 
-import smoke_http
+from scripts import smoke_http
 
 
 def make_response(status_code=200, body=None, text=""):
@@ -19,7 +19,7 @@ def test_health_check_retries_then_succeeds(mocker):
         requests.ConnectionError("服务尚未启动"),
         make_response(body={"status": "ok"}),
     ]
-    sleep = mocker.patch("smoke_http.time.sleep")
+    sleep = mocker.patch("scripts.smoke_http.time.sleep")
 
     smoke_http.wait_until_healthy(
         session,
@@ -38,7 +38,7 @@ def test_health_check_exhaustion_is_a_failure(mocker):
         status_code=503,
         text="Service Unavailable",
     )
-    mocker.patch("smoke_http.time.sleep")
+    mocker.patch("scripts.smoke_http.time.sleep")
 
     try:
         smoke_http.wait_until_healthy(session, "http://service", attempts=2)
@@ -65,7 +65,7 @@ def test_run_smoke_checks_three_business_endpoints(mocker):
     session.post.return_value = make_response(
         body={"token_type": "bearer", "access_token": "test-token"}
     )
-    mocker.patch("smoke_http.requests.Session", return_value=session)
+    mocker.patch("scripts.smoke_http.requests.Session", return_value=session)
 
     smoke_http.run_smoke("http://service", attempts=1, interval_seconds=0)
 
@@ -82,7 +82,7 @@ def test_run_smoke_checks_three_business_endpoints(mocker):
 
 
 def test_main_returns_one_when_smoke_fails(mocker):
-    mocker.patch("smoke_http.run_smoke", side_effect=RuntimeError("服务未就绪"))
+    mocker.patch("scripts.smoke_http.run_smoke", side_effect=RuntimeError("服务未就绪"))
 
     exit_code = smoke_http.main(
         ["--base-url", "http://service", "--health-attempts", "1"]
@@ -95,4 +95,3 @@ def test_main_rejects_invalid_retry_configuration():
     exit_code = smoke_http.main(["--health-attempts", "0"])
 
     assert exit_code == 2
-

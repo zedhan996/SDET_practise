@@ -174,7 +174,7 @@ jobs:
 
       - name: Run deployment Smoke gate
         # 测试容器通过Compose内部网络，以服务名api访问已启动的正式容器。
-        run: docker compose --profile test run --rm api-tests python smoke_http.py --base-url http://api:8000 --health-attempts 10 --health-interval 1
+        run: docker compose --profile test run --rm api-tests python -m scripts.smoke_http --base-url http://api:8000 --health-attempts 10 --health-interval 1
 
       - name: Log in to GitHub Container Registry
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'

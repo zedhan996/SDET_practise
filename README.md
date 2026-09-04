@@ -225,13 +225,13 @@ python -m uvicorn main:app --host 127.0.0.1 --port 8000 --log-config logging.ini
 再在另一个已激活同一虚拟环境的 PowerShell 窗口运行：
 
 ```powershell
-python smoke_http.py
+python -m scripts.smoke_http
 ```
 
 Smoke 脚本先在有限次数内等待 `/health` 就绪，再通过真实 HTTP 连接验证根接口、登录发放 Token 和数据库查询。默认目标是 `http://127.0.0.1:8000`，既可以通过 `SMOKE_BASE_URL` 环境变量切换地址，也可以直接传递参数：
 
 ```powershell
-python smoke_http.py --base-url http://127.0.0.1:8002 --health-attempts 10 --health-interval 1
+python -m scripts.smoke_http --base-url http://127.0.0.1:8002 --health-attempts 10 --health-interval 1
 ```
 
 全部通过返回退出码 `0`；健康检查耗尽或任一业务断言失败返回 `1`；非法重试参数返回 `2`。发布流水线可以根据退出码决定继续交付还是阻断。脚本自身的离线单元测试位于 `tests/smoke/test_smoke_http.py`，不会访问真实服务。
@@ -278,7 +278,7 @@ python -m app.agent.evaluation
 |-- main.py           FastAPI 服务端、数据模型和接口实现
 |-- tests/api/        API接口与可观测性测试
 |-- tests/ui/         Playwright与Selenium真实浏览器UI测试
-|-- smoke_http.py     需要真实服务的 HTTP Smoke 测试
+|-- scripts/smoke_http.py  需要真实服务的 HTTP Smoke 验收（python -m scripts.smoke_http）
 |-- tests/smoke/      Smoke等待、业务调用和退出码的离线单元测试
 |-- tests/mcp/        MCP参数、权限和超时边界测试
 |-- qa_tool.py        测试效能 CLI 工具

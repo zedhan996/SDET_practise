@@ -1,3 +1,5 @@
+"""部署后 HTTP Smoke 验收；通过 python -m scripts.smoke_http 运行。"""
+
 import argparse
 import os
 import sys

@@ -38,7 +38,8 @@ FROM base AS test
 COPY requirements-container-test.txt ./
 RUN python -m pip install --no-cache-dir -r requirements-container-test.txt
 
-COPY --chown=appuser:appgroup conftest.py smoke_http.py pytest-container.ini ./
+COPY --chown=appuser:appgroup conftest.py pytest-container.ini ./
+COPY --chown=appuser:appgroup scripts/__init__.py scripts/smoke_http.py ./scripts/
 COPY --chown=appuser:appgroup tests/api/test_api.py ./test_api.py
 
 USER appuser

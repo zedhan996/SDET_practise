@@ -37,5 +37,6 @@ rag_*.py
 mcp_*.py
 locustfile.py
 # Smoke脚本只会被Dockerfile的test阶段复制，runtime阶段仍不包含它。
-!smoke_http.py
+!scripts/__init__.py
+!scripts/smoke_http.py
 qa_tool.py
