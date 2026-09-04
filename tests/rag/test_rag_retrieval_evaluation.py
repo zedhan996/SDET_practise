@@ -1,6 +1,6 @@
-from rag_mvp import RetrievedChunk
-from rag_reranker import RerankedChunk
-from rag_retrieval_evaluation import (
+from app.rag.mvp import RetrievedChunk
+from app.rag.reranker import RerankedChunk
+from app.rag.retrieval_evaluation import (
     RerankerEvaluationResult,
     RetrievalEvaluationResult,
     build_evaluation_cases,

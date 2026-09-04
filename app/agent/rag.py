@@ -14,9 +14,9 @@ from .mvp import (
     ToolSpec,
     build_catalog_registry,
 )
-from rag_mvp import ChromaKnowledgeStore
-from rag_query import query_knowledge
-from rag_reranker import CandidateReranker
+from app.rag.mvp import ChromaKnowledgeStore
+from app.rag.query import query_knowledge
+from app.rag.reranker import CandidateReranker
 
 
 SEARCH_KNOWLEDGE_SCHEMA = {

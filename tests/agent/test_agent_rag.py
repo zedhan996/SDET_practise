@@ -4,8 +4,8 @@ from app.agent.rag import (
     RagKnowledgeToolHandler,
     build_catalog_knowledge_registry,
 )
-from rag_mvp import RetrievalResult, RetrievedChunk
-from rag_reranker import CandidateReranker
+from app.rag.mvp import RetrievalResult, RetrievedChunk
+from app.rag.reranker import CandidateReranker
 
 
 CATALOG_READ = frozenset({"catalog:read"})

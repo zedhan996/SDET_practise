@@ -1,7 +1,7 @@
 import uuid
 
-from rag_build_index import build_persistent_index
-from rag_mvp import ChromaKnowledgeStore, LocalHashEmbeddingFunction
+from app.rag.build_index import build_persistent_index
+from app.rag.mvp import ChromaKnowledgeStore, LocalHashEmbeddingFunction
 
 
 # 使用临时知识目录和本地哈希Embedding，验证文件加载到磁盘索引的完整构建流程。

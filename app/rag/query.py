@@ -6,18 +6,18 @@ import argparse
 from dataclasses import dataclass
 from pathlib import Path
 
-from rag_mvp import (
+from .mvp import (
     ChromaKnowledgeStore,
     build_sentence_transformer_embedding,
 )
-from rag_reranker import (
+from .reranker import (
     CandidateReranker,
     RerankedChunk,
     build_cross_encoder_reranker,
 )
 
 
-PROJECT_ROOT = Path(__file__).resolve().parent
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_PERSIST_DIRECTORY = PROJECT_ROOT / "data" / "chroma"
 
 

@@ -2,11 +2,11 @@ import os
 
 import pytest
 
-from rag_answer import answer_knowledge
-from rag_generation import OllamaTextGenerator
-from rag_mvp import ChromaKnowledgeStore, build_sentence_transformer_embedding
-from rag_query import DEFAULT_PERSIST_DIRECTORY
-from rag_reranker import build_cross_encoder_reranker
+from app.rag.answer import answer_knowledge
+from app.rag.generation import OllamaTextGenerator
+from app.rag.mvp import ChromaKnowledgeStore, build_sentence_transformer_embedding
+from app.rag.query import DEFAULT_PERSIST_DIRECTORY
+from app.rag.reranker import build_cross_encoder_reranker
 
 
 # 该测试会加载两个真实检索模型并调用本机Ollama，普通测试和CI默认跳过。
@@ -22,7 +22,7 @@ pytestmark = [
 # 验证Markdown索引、Embedding、Reranker、拒答门禁和Qwen生成的完整链路。
 def test_real_rag_chain_answers_auth_question_with_ollama():
     if not DEFAULT_PERSIST_DIRECTORY.exists():
-        pytest.fail("缺少data/chroma持久化索引，请先运行 python rag_build_index.py")
+        pytest.fail("缺少data/chroma持久化索引，请先运行 python -m app.rag.build_index")
 
     store = ChromaKnowledgeStore(
         collection_name="sdet-knowledge",

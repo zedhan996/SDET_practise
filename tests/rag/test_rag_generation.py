@@ -1,15 +1,15 @@
 import json
 from urllib import error as url_error
 
-from rag_generation import (
+from app.rag.generation import (
     GenerationError,
     OllamaTextGenerator,
     build_grounded_prompt,
     generate_grounded_answer,
 )
-from rag_mvp import RetrievedChunk
-from rag_query import KnowledgeQueryResult
-from rag_reranker import RerankedChunk
+from app.rag.mvp import RetrievedChunk
+from app.rag.query import KnowledgeQueryResult
+from app.rag.reranker import RerankedChunk
 
 
 def make_query_result(answerable: bool = True) -> KnowledgeQueryResult:

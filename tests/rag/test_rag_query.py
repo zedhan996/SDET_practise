@@ -1,6 +1,6 @@
-from rag_mvp import RetrievalResult, RetrievedChunk
-from rag_query import query_knowledge
-from rag_reranker import CandidateReranker
+from app.rag.mvp import RetrievalResult, RetrievedChunk
+from app.rag.query import query_knowledge
+from app.rag.reranker import CandidateReranker
 
 
 class StubStore:

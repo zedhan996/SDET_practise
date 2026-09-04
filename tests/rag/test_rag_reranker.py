@@ -1,5 +1,5 @@
-from rag_mvp import RetrievedChunk
-from rag_reranker import CandidateReranker
+from app.rag.mvp import RetrievedChunk
+from app.rag.reranker import CandidateReranker
 
 
 def make_chunk(source: str, content: str, similarity: float) -> RetrievedChunk:

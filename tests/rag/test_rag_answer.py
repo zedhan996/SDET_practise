@@ -1,6 +1,6 @@
-from rag_answer import answer_knowledge
-from rag_mvp import RetrievalResult, RetrievedChunk
-from rag_reranker import CandidateReranker
+from app.rag.answer import answer_knowledge
+from app.rag.mvp import RetrievalResult, RetrievedChunk
+from app.rag.reranker import CandidateReranker
 
 
 class StubStore:

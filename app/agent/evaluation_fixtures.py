@@ -19,8 +19,8 @@ from .rag import (
     OfflineCatalogKnowledgePlanner,
     RagKnowledgeToolHandler,
 )
-from rag_mvp import RetrievalResult, RetrievedChunk
-from rag_reranker import CandidateReranker
+from app.rag.mvp import RetrievalResult, RetrievedChunk
+from app.rag.reranker import CandidateReranker
 
 
 FIXTURE_VERSION = "offline-v1"

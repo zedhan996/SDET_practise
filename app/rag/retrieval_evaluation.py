@@ -7,14 +7,14 @@ import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
-from rag_mvp import (
+from .mvp import (
     ChromaKnowledgeStore,
     KnowledgeDocument,
     build_sentence_transformer_embedding,
     index_documents,
     load_knowledge_documents,
 )
-from rag_reranker import (
+from .reranker import (
     CandidateReranker,
     RerankedChunk,
     build_cross_encoder_reranker,
@@ -544,7 +544,7 @@ def format_evaluation_report(
 
 def build_evaluation_documents() -> list[KnowledgeDocument]:
     """从真实Markdown文件加载商品、鉴权和日志三个主题的评测知识。"""
-    return load_knowledge_documents(Path(__file__).parent / "knowledge")
+    return load_knowledge_documents(Path(__file__).resolve().parents[2] / "knowledge")
 
 
 def build_evaluation_cases() -> list[RetrievalEvaluationCase]:

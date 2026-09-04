@@ -2,7 +2,7 @@ import os
 
 import pytest
 
-from rag_mvp import (
+from app.rag.mvp import (
     ChromaKnowledgeStore,
     KnowledgeDocument,
     build_sentence_transformer_embedding,

@@ -287,10 +287,10 @@ python -m app.agent.evaluation
 |-- tests/agent/      Agent工具、RAG接入、Planner和评测测试
 |-- tests/rag/        RAG切片、检索、重排、生成和集成测试
 |-- eval_cases/       版本化的Agent/RAG评测输入与预期结果
-|-- rag_mvp.py        文档切分、Embedding、Chroma 写入和检索
-|-- rag_query.py      Top-k、Reranker 和拒答门禁查询入口
-|-- rag_generation.py Ollama 受控答案生成及上游错误映射
-|-- rag_answer.py     本地持久化知识库完整问答入口
+|-- app/rag/mvp.py        文档切分、Embedding、Chroma 写入和检索
+|-- app/rag/query.py      Top-k、Reranker 和拒答门禁查询入口
+|-- app/rag/generation.py Ollama 受控答案生成及上游错误映射
+|-- app/rag/answer.py     本地持久化知识库完整问答入口
 |-- logging.ini       Uvicorn 带时间戳的日志格式配置
 |-- pytest.ini        pytest 与 Playwright 失败产物配置
 |-- conftest.py       TestClient、数据库和鉴权等 Fixture

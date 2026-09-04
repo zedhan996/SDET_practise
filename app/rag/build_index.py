@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from rag_mvp import (
+from .mvp import (
     ChromaKnowledgeStore,
     build_sentence_transformer_embedding,
     index_documents,
@@ -15,7 +15,7 @@ from rag_mvp import (
 )
 
 
-PROJECT_ROOT = Path(__file__).resolve().parent
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_KNOWLEDGE_DIRECTORY = PROJECT_ROOT / "knowledge"
 DEFAULT_PERSIST_DIRECTORY = PROJECT_ROOT / "data" / "chroma"
 

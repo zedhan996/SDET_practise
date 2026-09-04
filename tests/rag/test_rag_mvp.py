@@ -1,6 +1,6 @@
 import uuid
 
-from rag_mvp import (
+from app.rag.mvp import (
     ChromaKnowledgeStore,
     KnowledgeDocument,
     LocalHashEmbeddingFunction,

@@ -10,7 +10,7 @@ from urllib import error as url_error
 from urllib import request as url_request
 from urllib.parse import urlparse
 
-from rag_query import KnowledgeQueryResult
+from .query import KnowledgeQueryResult
 
 
 TextGenerator = Callable[[str], str]

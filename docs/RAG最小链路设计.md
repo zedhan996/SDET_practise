@@ -21,7 +21,7 @@ Chroma 保存向量、文本和元数据
 返回 Top-k 相关片段
 ```
 
-`rag_mvp.py` 中的 `ChromaKnowledgeStore` 负责 Chroma 存储和检索，
+`app/rag/mvp.py` 中的 `ChromaKnowledgeStore` 负责 Chroma 存储和检索，
 `split_document()` 负责切分，`index_documents()` 负责组织索引流程。
 
 ## 原始知识文件与持久化索引
@@ -49,13 +49,13 @@ Embedding。`knowledge/` 是事实来源（Source of Truth）；Chroma 保存的
 本地构建真实索引执行：
 
 ```powershell
-python rag_build_index.py
+python -m app.rag.build_index
 ```
 
 默认生成位置为 `data/chroma/`。该目录属于可重新生成的产物，已加入 `.gitignore`；
 原始 `knowledge/*.md` 则应提交到 Git。
 
-持久化索引构建后，`rag_query.py` 负责执行完整查询门禁：
+持久化索引构建后，`app/rag/query.py` 负责执行完整查询门禁：
 
 ```text
 磁盘Chroma召回Top-k
@@ -67,7 +67,7 @@ python rag_build_index.py
 阈值必须显式传入，避免知识或模型变化后继续悄悄使用旧配置：
 
 ```powershell
-python rag_query.py "没有登录令牌时接口应该返回什么？" --threshold 0.0153
+python -m app.rag.query "没有登录令牌时接口应该返回什么？" --threshold 0.0153
 ```
 
 这个入口只返回通过门禁的知识片段，便于单独诊断召回、排序和阈值问题。
@@ -125,7 +125,7 @@ Recall@3 也较低，则应优先检查 Embedding 模型、文档内容、Chunk 
 
 ## Cross-Encoder Reranker
 
-`rag_reranker.py` 对向量检索已经召回的 Top-k 候选进行成对评分：
+`app/rag/reranker.py` 对向量检索已经召回的 Top-k 候选进行成对评分：
 
 ```text
 问题 + 候选Chunk
@@ -180,7 +180,7 @@ validation  验证集：固定阈值后，只评估而不再调整
 
 ## 检索评测集和阈值校准
 
-`rag_retrieval_evaluation.py` 使用正样本、语义改写、边界样本和领域外样本，
+`app/rag/retrieval_evaluation.py` 使用正样本、语义改写、边界样本和领域外样本，
 批量记录 Top-1 实际来源与相似度。正样本用于检查正确知识能否被召回，边界和领域外
 样本用于观察系统是否会错误接受知识库无法回答的问题。
 
@@ -190,7 +190,7 @@ validation  验证集：固定阈值后，只评估而不再调整
 
 ## 受控生成层
 
-`rag_generation.py` 已建立与具体模型无关的 `TextGenerator` 接口。生成层只接受
+`app/rag/generation.py` 已建立与具体模型无关的 `TextGenerator` 接口。生成层只接受
 `answerable=True` 且具有重排 Top1 的查询结果：
 
 ```text
@@ -222,7 +222,7 @@ Ollama 服务，默认模型为 `qwen3:4b-instruct`。项目只保存连接配�
 2.5 GB 的模型权重放在项目外的 `E:\work\study\ai-local\ai-models\ollama`，不会进入 Git 仓库。
 
 ```text
-rag_answer.py
+app/rag/answer.py
     ↓ 打开data/chroma
 Embedding召回Top-3
     ↓
@@ -252,8 +252,8 @@ Remove-Item Env:RUN_OLLAMA_INTEGRATION
 完整问答演示命令：
 
 ```powershell
-python rag_answer.py "没有登录令牌时接口应该返回什么？"
-python rag_answer.py "商品价格由哪位管理员审批？"
+python -m app.rag.answer "没有登录令牌时接口应该返回什么？"
+python -m app.rag.answer "商品价格由哪位管理员审批？"
 ```
 
 第一条应通过门禁并调用模型回答 401；第二条应由 Reranker 分数门禁直接拒答，而且不会

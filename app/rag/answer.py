@@ -4,15 +4,15 @@ from __future__ import annotations
 
 import argparse
 
-from rag_generation import (
+from .generation import (
     GroundedAnswer,
     OllamaTextGenerator,
     TextGenerator,
     generate_grounded_answer,
 )
-from rag_mvp import ChromaKnowledgeStore, build_sentence_transformer_embedding
-from rag_query import DEFAULT_PERSIST_DIRECTORY, query_knowledge
-from rag_reranker import CandidateReranker, build_cross_encoder_reranker
+from .mvp import ChromaKnowledgeStore, build_sentence_transformer_embedding
+from .query import DEFAULT_PERSIST_DIRECTORY, query_knowledge
+from .reranker import CandidateReranker, build_cross_encoder_reranker
 
 
 DEFAULT_RERANKER_THRESHOLD = 0.0153
